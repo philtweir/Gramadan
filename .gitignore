@@ -302,3 +302,8 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 *.xml
+
+# Python
+# =========================
+
+__pycache__

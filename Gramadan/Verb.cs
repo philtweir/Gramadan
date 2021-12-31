@@ -28,6 +28,7 @@ namespace Gramadan
 		public Dictionary<VerbMood, Dictionary<VerbPerson, List<Form>>> moods=new Dictionary<VerbMood, Dictionary<VerbPerson, List<Form>>>();
 
 		//Rules for building verbal phrases:
+		// PTW: why is this order different from VP.cs?
 		public Dictionary<VPTense, Dictionary<VPPerson, Dictionary<VPShape, Dictionary<VPPolarity, List<VerbTenseRule>>>>> tenseRules=new Dictionary<VPTense, Dictionary<VPPerson, Dictionary<VPShape, Dictionary<VPPolarity, List<VerbTenseRule>>>>>();
 
 		//Returns tense rules that match the parameters. In each paramer, '.Any' means 'any'.
