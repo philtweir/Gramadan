@@ -13,14 +13,14 @@ namespace Tester
 	{
 		public static void Nouns()
 		{
-			StreamWriter writer=new StreamWriter(@"C:\MBM\Gramadan\consistency-report-nouns.txt");
-			string[] folderNames= { "noun", "nounNew" };
+			StreamWriter writer=new StreamWriter(@"consistency-report-nouns.txt");
+			string[] folderNames= { "noun" };
 
 			int count=0;
 			int countNoPl=0;
 
 			foreach(string folderName in folderNames) {
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folderName)) {
+				foreach(string file in Directory.GetFiles(@"data/"+folderName)) {
 					XmlDocument doc=new XmlDocument(); doc.Load(file);
 					Noun noun=new Noun(doc);
 
@@ -47,13 +47,13 @@ namespace Tester
 		}
 		public static void Adjectives()
 		{
-			StreamWriter writer=new StreamWriter(@"C:\MBM\Gramadan\consistency-report-adjectives.txt");
-			string[] folderNames= { "adjective", "adjectiveNew" };
+			StreamWriter writer=new StreamWriter(@"consistency-report-adjectives.txt");
+			string[] folderNames= { "adjective" };
 
 			int count=0;
 
 			foreach(string folderName in folderNames) {
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folderName)) {
+				foreach(string file in Directory.GetFiles(@"data/"+folderName)) {
 					XmlDocument doc=new XmlDocument(); doc.Load(file);
 					Adjective adj=new Adjective(doc);
 
@@ -81,12 +81,12 @@ namespace Tester
 		}
 		public static void Similarity()
 		{
-			StreamWriter writer=new StreamWriter(@"C:\MBM\Gramadan\consistency-report-similarity.txt");
-			string[] folderNames= { "noun", "nounNew", "adjective", "adjectiveNew", "verb", "verbNew", "verbNew2" };
+			StreamWriter writer=new StreamWriter(@"consistency-report-similarity.txt");
+			string[] folderNames= { "noun", "adjective", "verb" };
 
 			foreach(string folderName in folderNames) {
 				Console.WriteLine(folderName);
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folderName)) {
+				foreach(string file in Directory.GetFiles(@"data/"+folderName)) {
 					XmlDocument doc=new XmlDocument(); doc.Load(file);
 
 					string nickname=Path.GetFileNameWithoutExtension(file);
@@ -107,23 +107,26 @@ namespace Tester
 		}
 		public static void VerbalNouns()
 		{
-			StreamWriter writer=new StreamWriter(@"C:\MBM\Gramadan\consistency-vns.txt");
-			string[] folderNames= { "verbNew" };
+			StreamWriter writer=new StreamWriter(@"consistency-vns.txt");
+			string[] folderNames= { "verb" };
 
 			int count=0;
 			Dictionary<string, string> collector=new Dictionary<string, string>();
 
 			foreach(string folderName in folderNames) {
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folderName)) {
+				foreach(string file in Directory.GetFiles(@"data/"+folderName)) {
 					XmlDocument doc=new XmlDocument(); doc.Load(file);
 					Verb v=new Verb(doc);
 
-					string vn=v.verbalAdjective[0].value;
-					if(!collector.ContainsKey(vn)) {
-						collector.Add(vn, v.getNickname());
-					} else {
-						writer.WriteLine(folderName+"\t"+vn+"\t"+collector[vn]+"\t"+v.getNickname());
-						count++;
+					if (file != @"data/verb/féad_verb.xml" &&
+					    file != @"data/verb/bí_verb.xml") {
+						string vn=v.verbalAdjective[0].value;
+						if(!collector.ContainsKey(vn)) {
+							collector.Add(vn, v.getNickname());
+						} else {
+							writer.WriteLine(folderName+"\t"+vn+"\t"+collector[vn]+"\t"+v.getNickname());
+							count++;
+						}
 					}
 				}
 			}
@@ -133,14 +136,14 @@ namespace Tester
 		}
 		public static void VerbalWhitespace()
 		{
-			StreamWriter writer=new StreamWriter(@"C:\MBM\Gramadan\consistency-whitespace.txt");
-			string[] folderNames= { "verbNew", "verbNew2" };
+			StreamWriter writer=new StreamWriter(@"consistency-whitespace.txt");
+			string[] folderNames= { "verb" };
 
 			int count=0;
 			Dictionary<string, string> collector=new Dictionary<string, string>();
 
 			foreach(string folderName in folderNames) {
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folderName)) {
+				foreach(string file in Directory.GetFiles(@"data/"+folderName)) {
 					XmlDocument doc=new XmlDocument(); doc.Load(file);
 					foreach(XmlAttribute attr in doc.SelectNodes("//*/@*")) {
 						if(Regex.IsMatch(attr.Value, "ie")) {

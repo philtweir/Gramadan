@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Gramadan;
+using Tester;
 using System.IO;
 using System.Xml;
 using System.Xml.Linq;
@@ -11,25 +12,36 @@ namespace Tester
 	{
 		static void Main(string[] args)
 		{
-			//TestPossessives.PossNP();
+			Consistency.Nouns();
+			Consistency.VerbalNouns();
+			Consistency.Adjectives();
+			Consistency.Similarity();
+			QualityControl.AinmfhocailBearnai();
+			QualityControl.AidiachtaiBearnai();
+			QualityControl.BriathraInfinideachaBearnai();
+			QualityControl.BriathraFinideachaBearnai();
+			// // QualityControl.AinmfhocailRegex();
+			// // QualityControl.AidiachtaiRegex();
+			// // Gadaíocht <-- no input available
+			TestPossessives.PossNP();
 			TestPossessives.PrepPossNP();
-			//ShortTest();
-			//FindAll();
-			//Go();
+			ShortTest();
+			FindAll();
+			Go();
 			Console.Write("Déanta."); Console.ReadLine();
 		}
 
 		//Just quickly test something:
 		public static void ShortTest() {
-			Noun n = new Noun(@"C:\MBM\michmech\BuNaMo\noun\Gael_masc1.xml");
-			Adjective adj = new Adjective(@"C:\MBM\michmech\BuNaMo\adjective\Gaelach_adj1.xml");
+			Noun n = new Noun(@"data/noun/Gael_masc1.xml");
+			Adjective adj = new Adjective(@"data/adjective/Gaelach_adj1.xml");
 			NP np = new NP(n, adj);
 			Console.WriteLine(np.print());
 		}
 
 		//Find all words that have some property:
 		public static void FindAll() {
-			foreach(string file in Directory.GetFiles(@"C:\MBM\michmech\BuNaMo\noun")) {
+			foreach(string file in Directory.GetFiles(@"data/noun")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Noun noun=new Noun(doc);
 				foreach(FormPlGen form in noun.plGen) {
@@ -45,39 +57,39 @@ namespace Tester
 		/// </summary>
 		public static void Resave()
 		{
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\noun")) {
+			foreach(string file in Directory.GetFiles(@"data/noun")) {
 				XmlDocument doc = new XmlDocument(); doc.Load(file);
 				Noun noun = new Noun(doc);
-				StreamWriter writer = new StreamWriter(@"C:\MBM\Gramadan\BuNaMo\noun\" + noun.getNickname() + ".xml");
-				writer.Write(PrettyPrintXml(noun.printXml().DocumentElement.OuterXml));
+				FileStream writer = new FileStream(@"data/noun/" + noun.getNickname() + ".xml", FileMode.Create);
+				PrettyPrintXml(noun.printXml().DocumentElement.OuterXml, writer);
 				writer.Close();
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\adjective")) {
+			foreach(string file in Directory.GetFiles(@"data/adjective")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Adjective adjective=new Adjective(doc);
-				StreamWriter writer=new StreamWriter(@"C:\MBM\Gramadan\BuNaMo\adjective\"+adjective.getNickname()+".xml");
-				writer.Write(PrettyPrintXml(adjective.printXml().DocumentElement.OuterXml));
+				FileStream writer=new FileStream(@"data/adjective/"+adjective.getNickname()+".xml", FileMode.Create);
+				PrettyPrintXml(adjective.printXml().DocumentElement.OuterXml, writer);
 				writer.Close();
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\nounPhrase")) {
+			foreach(string file in Directory.GetFiles(@"data/nounPhrase")) {
 				XmlDocument doc = new XmlDocument(); doc.Load(file);
 				NP np = new NP(doc);
-				StreamWriter writer = new StreamWriter(@"C:\MBM\Gramadan\BuNaMo2\nounPhrase\" + np.getNickname() + ".xml");
-				writer.Write(PrettyPrintXml(np.printXml().DocumentElement.OuterXml));
+				FileStream writer = new FileStream(@"data/nounPhrase/" + np.getNickname() + ".xml", FileMode.Create);
+				PrettyPrintXml(np.printXml().DocumentElement.OuterXml, writer);
 				writer.Close();
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\preposition")) {
+			foreach(string file in Directory.GetFiles(@"data/preposition")) {
 				XmlDocument doc = new XmlDocument(); doc.Load(file);
 				Preposition preposition = new Preposition(doc);
-				StreamWriter writer = new StreamWriter(@"C:\MBM\Gramadan\BuNaMo2\preposition\" + preposition.getNickname() + ".xml");
-				writer.Write(PrettyPrintXml(preposition.printXml().DocumentElement.OuterXml));
+				FileStream writer = new FileStream(@"data/preposition/" + preposition.getNickname() + ".xml", FileMode.Create);
+				PrettyPrintXml(preposition.printXml().DocumentElement.OuterXml, writer);
 				writer.Close();
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\verb")) {
+			foreach(string file in Directory.GetFiles(@"data/verb")) {
 				XmlDocument doc = new XmlDocument(); doc.Load(file);
 				Verb verb = new Verb(doc);
-				StreamWriter writer = new StreamWriter(@"C:\MBM\Gramadan\BuNaMo2\verb\" + verb.getNickname() + ".xml");
-				writer.Write(PrettyPrintXml(verb.printXml().DocumentElement.OuterXml));
+				FileStream writer = new FileStream(@"data/verb/" + verb.getNickname() + ".xml", FileMode.Create);
+				PrettyPrintXml(verb.printXml().DocumentElement.OuterXml, writer);
 				writer.Close();
 			}
 		}
@@ -95,48 +107,48 @@ namespace Tester
 			//NB: the nicknames returned by these have been lower-cased
 			
 			PrinterNeid printer=new PrinterNeid();
-			foreach(string file in Directory.GetFiles(@"C:\MBM\michmech\BuNaMo\noun")) {
+			foreach(string file in Directory.GetFiles(@"data/noun")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Noun noun=new Noun(doc);
 				if(!doFilter || filterNicknames.Contains(noun.getNickname().ToLower())) {
-					StreamWriter writer=new StreamWriter(@"C:\MBM\michmech\Gramadan\NeidOutput\"+noun.getNickname()+".xml");
-					writer.Write(PrettyPrintXml(printer.printNounXml(noun)));
+					FileStream writer=new FileStream(@"../NeidOutput/"+noun.getNickname()+".xml", FileMode.Create);
+					PrettyPrintXml(printer.printNounXml(noun), writer);
 					writer.Close();
 				}
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\michmech\BuNaMo\adjective")) {
+			foreach(string file in Directory.GetFiles(@"data/adjective")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Adjective adjective=new Adjective(doc);
 				if(!doFilter || filterNicknames.Contains(adjective.getNickname().ToLower())) {
-					StreamWriter writer=new StreamWriter(@"C:\MBM\michmech\Gramadan\NeidOutput\"+adjective.getNickname()+".xml");
-					writer.Write(PrettyPrintXml(printer.printAdjectiveXml(adjective)));
+					FileStream writer=new FileStream(@"../NeidOutput/"+adjective.getNickname()+".xml", FileMode.Create);
+					PrettyPrintXml(printer.printAdjectiveXml(adjective), writer);
 					writer.Close();
 				}
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\michmech\BuNaMo\nounPhrase")) {
+			foreach(string file in Directory.GetFiles(@"data/nounPhrase")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				NP np=new NP(doc);
 				if(!doFilter || filterNicknames.Contains(np.getNickname().ToLower())) {
-					StreamWriter writer=new StreamWriter(@"C:\MBM\michmech\Gramadan\NeidOutput\"+np.getNickname()+".xml");
-					writer.Write(PrettyPrintXml(printer.printNPXml(np)));
+					FileStream writer=new FileStream(@"../NeidOutput/"+np.getNickname()+".xml", FileMode.Create);
+					PrettyPrintXml(printer.printNPXml(np), writer);
 					writer.Close();
 				}
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\michmech\BuNaMo\preposition")) {
+			foreach(string file in Directory.GetFiles(@"data/preposition")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Preposition preposition=new Preposition(doc);
 				if(!doFilter || filterNicknames.Contains(preposition.getNickname().ToLower())) {
-					StreamWriter writer=new StreamWriter(@"C:\MBM\michmech\Gramadan\NeidOutput\"+preposition.getNickname()+".xml");
-					writer.Write(PrettyPrintXml(printer.printPrepositionXml(preposition)));
+					FileStream writer=new FileStream(@"../NeidOutput/"+preposition.getNickname()+".xml", FileMode.Create);
+					PrettyPrintXml(printer.printPrepositionXml(preposition), writer);
 					writer.Close();
 				}
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\michmech\BuNaMo\verb")) {
+			foreach(string file in Directory.GetFiles(@"data/verb")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Verb verb=new Verb(doc);
 				if(!doFilter || filterNicknames.Contains(verb.getNickname().ToLower())) {
-					StreamWriter writer=new StreamWriter(@"C:\MBM\michmech\Gramadan\NeidOutput\"+verb.getNickname()+".xml");
-					writer.Write(PrettyPrintXml(printer.printVerbXml(verb)));
+					FileStream writer=new FileStream(@"../NeidOutput/"+verb.getNickname()+".xml", FileMode.Create);
+					PrettyPrintXml(printer.printVerbXml(verb), writer);
 					writer.Close();
 				}
 			}
@@ -147,7 +159,7 @@ namespace Tester
 		}
 		private static List<string> FilterFromFile(List<string> nicknames)
 		{
-			StreamReader reader=new StreamReader(@"C:\deleteme\filter.txt");
+			StreamReader reader=new StreamReader(@"filter.txt");
 			while(reader.Peek()>-1) {
 				string line=reader.ReadLine().Trim().ToLower();
 				if(line!="" && !nicknames.Contains(line)) nicknames.Add(line);
@@ -158,7 +170,7 @@ namespace Tester
 		private static List<string> FilterFromNeidTrGrams()
 		{
 			List<string> nicknames=new List<string>();
-			XmlTextReader xmlReader=new XmlTextReader(@"C:\deleteme\2D.xml"); xmlReader.Namespaces=false;
+			XmlTextReader xmlReader=new XmlTextReader(@"2D.xml"); xmlReader.Namespaces=false;
 			while(xmlReader.Read()) {
 				if(xmlReader.NodeType==XmlNodeType.Element && xmlReader.Name=="Entry") {
 					XmlDocument entry=new XmlDocument(); entry.Load(xmlReader.ReadSubtree());
@@ -180,11 +192,11 @@ namespace Tester
 			PrinterNeid printer=new PrinterNeid(false);
 			StreamWriter writer;
 
-			writer = new StreamWriter(@"C:\MBM\Gramadan\NeidOutputBulk\nouns.xml");
+			writer = new StreamWriter(@"../NeidOutputBulk/nouns.xml");
 			writer.WriteLine("<?xml version='1.0' encoding='utf-8'?>");
 			writer.WriteLine("<?xml-stylesheet type='text/xsl' href='!lemmas.xsl'?>");
 			writer.WriteLine("<lemmas>");
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\noun")) {
+			foreach(string file in Directory.GetFiles(@"data/noun")) {
 				XmlDocument doc = new XmlDocument(); doc.Load(file);
 				Noun noun = new Noun(doc);
 				writer.WriteLine(printer.printNounXml(noun));
@@ -192,11 +204,11 @@ namespace Tester
 			writer.WriteLine("</lemmas>");
 			writer.Close();
 
-			writer = new StreamWriter(@"C:\MBM\Gramadan\NeidOutputBulk\nounPhrases.xml");
+			writer = new StreamWriter(@"../NeidOutputBulk/nounPhrases.xml");
 			writer.WriteLine("<?xml version='1.0' encoding='utf-8'?>");
 			writer.WriteLine("<?xml-stylesheet type='text/xsl' href='!lemmas.xsl'?>");
 			writer.WriteLine("<lemmas>");
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\nounPhrase")) {
+			foreach(string file in Directory.GetFiles(@"data/nounPhrase")) {
 				XmlDocument doc = new XmlDocument(); doc.Load(file);
 				NP np = new NP(doc);
 				writer.WriteLine(printer.printNPXml(np));
@@ -204,11 +216,11 @@ namespace Tester
 			writer.WriteLine("</lemmas>");
 			writer.Close();
 
-			writer = new StreamWriter(@"C:\MBM\Gramadan\NeidOutputBulk\adjectives.xml");
+			writer = new StreamWriter(@"../NeidOutputBulk/adjectives.xml");
 			writer.WriteLine("<?xml version='1.0' encoding='utf-8'?>");
 			writer.WriteLine("<?xml-stylesheet type='text/xsl' href='!lemmas.xsl'?>");
 			writer.WriteLine("<lemmas>");
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\adjective")) {
+			foreach(string file in Directory.GetFiles(@"data/adjective")) {
 				XmlDocument doc = new XmlDocument(); doc.Load(file);
 				Adjective a = new Adjective(doc);
 				writer.WriteLine(printer.printAdjectiveXml(a));
@@ -216,11 +228,11 @@ namespace Tester
 			writer.WriteLine("</lemmas>");
 			writer.Close();
 
-			writer = new StreamWriter(@"C:\MBM\Gramadan\NeidOutputBulk\prepositions.xml");
+			writer = new StreamWriter(@"../NeidOutputBulk/prepositions.xml");
 			writer.WriteLine("<?xml version='1.0' encoding='utf-8'?>");
 			writer.WriteLine("<?xml-stylesheet type='text/xsl' href='!lemmas.xsl'?>");
 			writer.WriteLine("<lemmas>");
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\preposition")) {
+			foreach(string file in Directory.GetFiles(@"data/preposition")) {
 				XmlDocument doc = new XmlDocument(); doc.Load(file);
 				Preposition p = new Preposition(doc);
 				writer.WriteLine(printer.printPrepositionXml(p));
@@ -228,11 +240,11 @@ namespace Tester
 			writer.WriteLine("</lemmas>");
 			writer.Close();
 
-			writer = new StreamWriter(@"C:\MBM\Gramadan\NeidOutputBulk\verbs.xml");
+			writer = new StreamWriter(@"../NeidOutputBulk/verbs.xml");
 			writer.WriteLine("<?xml version='1.0' encoding='utf-8'?>");
 			writer.WriteLine("<?xml-stylesheet type='text/xsl' href='!lemmas.xsl'?>");
 			writer.WriteLine("<lemmas>");
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\verb")) {
+			foreach(string file in Directory.GetFiles(@"data/verb")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Verb v=new Verb(doc);
 				writer.WriteLine(printer.printVerbXml(v));
@@ -246,28 +258,28 @@ namespace Tester
 		/// </summary>
 		public static void ListAll()
 		{
-			StreamWriter writer=new StreamWriter(@"C:\MBM\Gramadan\listAll.txt");
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\noun")) {
+			StreamWriter writer=new StreamWriter(@"../listAll.txt");
+			foreach(string file in Directory.GetFiles(@"data/noun")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Noun item=new Noun(doc);
 				writer.WriteLine("ainmfhocal\t"+item.getLemma()+"\t"+item.getNickname());
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\nounPhrase")) {
+			foreach(string file in Directory.GetFiles(@"data/nounPhrase")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				NP item=new NP(doc);
 				writer.WriteLine("frása ainmfhoclach\t"+item.getLemma()+"\t"+item.getNickname());
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\adjective")) {
+			foreach(string file in Directory.GetFiles(@"data/adjective")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Adjective item=new Adjective(doc);
 				writer.WriteLine("aidiacht\t"+item.getLemma()+"\t"+item.getNickname());
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\verb")) {
+			foreach(string file in Directory.GetFiles(@"data/verb")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Verb item=new Verb(doc);
 				writer.WriteLine("briathar\t"+item.getLemma()+"\t"+item.getNickname());
 			}
-			foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\preposition")) {
+			foreach(string file in Directory.GetFiles(@"data/preposition")) {
 				XmlDocument doc=new XmlDocument(); doc.Load(file);
 				Preposition item=new Preposition(doc);
 				writer.WriteLine("réamhfhocal\t"+item.getLemma()+"\t"+item.getNickname());
@@ -275,9 +287,17 @@ namespace Tester
 			writer.Close();
 		}
 
-		public static string PrettyPrintXml(string doc)
+		public static string PrettyPrintXml(string doc, FileStream writer)
 		{
 			XDocument xdoc=XDocument.Load(new StringReader(doc));
+			// xdoc.Save(writer, SaveOptions.None);
+			using (XmlTextWriter xmlWriter = new XmlTextWriter(writer, System.Text.Encoding.UTF8)) {
+				xmlWriter.QuoteChar = '\'';
+				xmlWriter.Formatting = Formatting.Indented;
+				xmlWriter.Indentation = 1;
+				xmlWriter.IndentChar = '\t';
+				xdoc.Save(xmlWriter);
+			}
 			return xdoc.ToString(SaveOptions.None);
 		}
 		private static string clean4xml(string text)

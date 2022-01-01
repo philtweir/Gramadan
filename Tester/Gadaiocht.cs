@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 
+// PTW: don't seem to have input for this one
+//
 namespace Tester
 {
 	class Gadaiocht

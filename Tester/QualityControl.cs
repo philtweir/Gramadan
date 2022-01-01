@@ -11,7 +11,7 @@ namespace Tester
 	{
 		public static void AinmfhocailBearnai()
 		{
-			StreamWriter writer=new StreamWriter(@"E:\deleteme\ainmfhocail-bearnaí.txt");
+			StreamWriter writer=new StreamWriter(@"ainmfhocail-bearnaí.txt");
 			writer.Write("fillteán"+"\t"+"leama"+"\t"+"inscne"+"\t"+"díochlaonadh");
 			writer.Write("\t"+"fadhb");
 			writer.Write("\t"+"ginideach uatha");
@@ -19,9 +19,9 @@ namespace Tester
 			writer.Write("\t"+"ginideach iolra");
 			writer.WriteLine();
 
-			string[] folders= { "noun", "nounNew", "nounUnsafe" };
+			string[] folders= { "noun" };
 			foreach(string folder in folders) {
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folder, "*.xml")) {
+				foreach(string file in Directory.GetFiles(@"data/"+folder, "*.xml")) {
 					Console.WriteLine(file);
 					string problem="";
 
@@ -52,7 +52,7 @@ namespace Tester
 		}
 		public static void AidiachtaiBearnai()
 		{
-			StreamWriter writer=new StreamWriter(@"E:\deleteme\aidiachtaí-bearnaí.txt");
+			StreamWriter writer=new StreamWriter(@"aidiachtaí-bearnaí.txt");
 			writer.Write("fillteán"+"\t"+"leama"+"\t"+"díochlaonadh");
 			writer.Write("\t"+"fadhb");
 			writer.Write("\t"+"ginideach firinsneach");
@@ -61,9 +61,9 @@ namespace Tester
 			writer.Write("\t"+"foirm chéimithe");
 			writer.WriteLine();
 
-			string[] folders= { "adjective", "adjectiveUnsafe" };
+			string[] folders= { "adjective" };
 			foreach(string folder in folders) {
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folder, "*.xml")) {
+				foreach(string file in Directory.GetFiles(@"data/"+folder, "*.xml")) {
 					Console.WriteLine(file);
 					string problem="";
 
@@ -91,16 +91,16 @@ namespace Tester
 		}
 		public static void BriathraInfinideachaBearnai()
 		{
-			StreamWriter writer=new StreamWriter(@"E:\deleteme\briathra-infinideacha-bearnaí.txt");
+			StreamWriter writer=new StreamWriter(@"briathra-infinideacha-bearnaí.txt");
 			writer.Write("fillteán"+"\t"+"leama");
 			writer.Write("\t"+"fadhb");
 			writer.Write("\t"+"ainm briathartha");
 			writer.Write("\t"+"aidiacht bhriathartha");
 			writer.WriteLine();
 
-			string[] folders= { "verb", "verbUnsafe" };
+			string[] folders= { "verb" };
 			foreach(string folder in folders) {
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folder, "*.xml")) {
+				foreach(string file in Directory.GetFiles(@"data/"+folder, "*.xml")) {
 					Console.WriteLine(file);
 					string problem="";
 
@@ -132,7 +132,7 @@ namespace Tester
 			moods.Add(VerbMood.Imper, "modh ordaitheach");
 			moods.Add(VerbMood.Subj, "modh foshuiteach");
 
-			StreamWriter writer=new StreamWriter(@"E:\deleteme\briathra-finideacha-bearnaí.txt");
+			StreamWriter writer=new StreamWriter(@"briathra-finideacha-bearnaí.txt");
 			writer.Write("fillteán"+"\t"+"leama"+"\t"+"aimsir/modh");
 			writer.Write("\t"+"fadhb");
 			writer.Write("\t"+"bunfhoirm scartha");
@@ -145,9 +145,9 @@ namespace Tester
 			writer.Write("\t"+"saorbhriathar");
 			writer.WriteLine();
 
-			string[] folders= { "verb", "verbUnsafe" };
+			string[] folders= { "verb" };
 			foreach(string folder in folders) {
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folder, "*.xml")) {
+				foreach(string file in Directory.GetFiles(@"data/"+folder, "*.xml")) {
 					Console.WriteLine(file);
 					Verb v=new Verb(file);
 
@@ -207,13 +207,13 @@ namespace Tester
 
 		public static void AinmfhocailRegex(string regex, string filenameEnding)
 		{
-			StreamWriter writer=new StreamWriter(@"E:\deleteme\ainmfhocail-"+filenameEnding+".txt");
+			StreamWriter writer=new StreamWriter(@"ainmfhocail-"+filenameEnding+".txt");
 			writer.Write("fillteán"+"\t"+"leama"+"\t"+"inscne"+"\t"+"díochlaonadh mar atá"+"\t"+"díochlaonadh nua");
 			writer.WriteLine();
 
-			string[] folders= { "noun", "nounNew", "nounUnsafe" };
+			string[] folders= { "noun" };
 			foreach(string folder in folders) {
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folder, "*.xml")) {
+				foreach(string file in Directory.GetFiles(@"data/"+folder, "*.xml")) {
 					Console.WriteLine(file);
 					Noun n=new Noun(file);
 					if(Regex.IsMatch(n.getLemma(), regex)) {
@@ -226,13 +226,13 @@ namespace Tester
 		}
 		public static void AidiachtaiRegex(string regex, string filenameEnding)
 		{
-			StreamWriter writer=new StreamWriter(@"E:\deleteme\aidiachtaí-"+filenameEnding+".txt");
+			StreamWriter writer=new StreamWriter(@"aidiachtaí-"+filenameEnding+".txt");
 			writer.Write("fillteán"+"\t"+"leama"+"\t"+"díochlaonadh"+"\t"+"díochlaonadh nua");
 			writer.WriteLine();
 
-			string[] folders= { "adjective", "adjectiveUnsafe" };
+			string[] folders= { "adjective" };
 			foreach(string folder in folders) {
-				foreach(string file in Directory.GetFiles(@"C:\MBM\Gramadan\BuNaMo\"+folder, "*.xml")) {
+				foreach(string file in Directory.GetFiles(@"data/"+folder, "*.xml")) {
 					Console.WriteLine(file);
 					Adjective a=new Adjective(file);
 					if(Regex.IsMatch(a.getLemma(), regex)) {
