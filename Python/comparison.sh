@@ -2,6 +2,7 @@
 
 # 1. Start by getting a copy of BuNaMo (INMD)
 (cd .. && git clone https://github.com/michmech/BuNaMo data) || (cd ../data && git pull)
+mkdir -p output
 rm -f output/data
 ln -s ../../data output/data
 rm -f ../Tester/data
@@ -26,11 +27,11 @@ echo "Completed C#"
 echo "Running Python"
 mkdir -p output && cd output
 rm -f OUTPUT.txt
-echo "" | (PYTHONPATH=$PYTHONPATH:.. python3 -m gramadan.tester.program) > OUTPUT.txt
+echo "" | (poetry run python -m gramadan.tester.program) > OUTPUT.txt
 cd ..
 echo "Completed Python"
 
 # 4. Finally execute the comparison tool
 
 echo "Comparing"
-pytest tests
+poetry run pytest tests

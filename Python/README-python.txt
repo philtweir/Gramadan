@@ -12,7 +12,7 @@ and passes both mypy and black checkers.
 
 This can be installed with [poetry](https://python-poetry.org/):
 
-    poetry install .
+    poetry install
 
 The test suite can be executed, from this directory.
 
@@ -21,7 +21,7 @@ The test suite can be executed, from this directory.
 If you do not wish to install or run the .NET setup, you can still execute the pure Python
 test suite:
 
-    pytest tests/python
+    poetry run pytest tests/python
 
 ## Comparison Checking
 
@@ -43,4 +43,8 @@ For the purposes of comparison, the following `xbuild` was used:
     Mono, Version 6.8.0.105
     Copyright (C) 2005-2013 Various Mono authors
 
-along with Python 3.9.7
+The command executed in the Tester folder was:
+
+    xbuild
+
+The equivalent Python was originally compared with Python 3.9.7
