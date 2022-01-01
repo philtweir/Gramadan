@@ -112,7 +112,7 @@ class Noun:
 
     # Constructors:
     @classmethod
-    def create_from_info(cls, si: SingularInfo, pi: Optional[PluralInfo]) -> Noun:
+    def create_from_info(cls, si: SingularInfo, pi: Optional[PluralInfo] = None) -> Noun:
         sgNom: list[FormSg] = []
         wf: Form
         for wf in si.nominative:

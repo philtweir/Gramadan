@@ -3,6 +3,10 @@ from dataclasses import dataclass, field
 from .features import FormSg, Form, FormPlGen, Strength
 from .opers import Opers
 
+# FIXME
+# IMPORTANT NOTE: the original C# tester does not seem
+# to cover these classes, so Python testing is non-existent
+# for these so far.
 
 @dataclass
 class PluralInfo:

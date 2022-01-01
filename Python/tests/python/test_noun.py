@@ -3,6 +3,7 @@ from lxml import etree as ET
 
 from gramadan.noun import Noun
 from gramadan.features import Gender
+from gramadan.singular_info import SingularInfoE
 
 # With thanks to BuNaMo
 # https://github.com/michmech/BuNaMo
@@ -40,8 +41,7 @@ NOUNS_XML = {
         """
 }
 
-@pytest.fixture
-def nouns():
+def nouns_xml():
     nouns = {
         lemma: ET.ElementTree(ET.fromstring(xml))
         for lemma, xml in
@@ -55,6 +55,28 @@ def nouns():
         if isinstance(xml, ET._ElementTree)
     }
 
+def noun_clárú():
+    singular_info = SingularInfoE(
+        lemma='clárú',
+        gender=Gender.Masc,
+        syncope=True,
+        doubleDative=False,
+    )
+    noun = Noun.create_from_info(singular_info)
+    return noun
+
+def nouns_py():
+    return {
+        fn[5:]: fn_def()
+        for fn, fn_def in
+        globals().items()
+        if fn.startswith('noun_')
+    }
+
+NOUNS_FROM_XML = nouns_xml()
+NOUNS_FROM_PY = nouns_py()
+
+@pytest.mark.parametrize('nouns', (NOUNS_FROM_XML, NOUNS_FROM_PY))
 def test_noun_clárú_behaves_as_expected(nouns):
     clárú = nouns['clárú']
     assert clárú.getLemma() == 'clárú'
@@ -64,7 +86,11 @@ def test_noun_clárú_behaves_as_expected(nouns):
     assert clárú.sgNom[0].value == 'clárú'
     assert len(clárú.sgGen) == 1
     assert clárú.sgGen[0].value == 'cláraithe'
-    assert len(clárú.sgVoc) == 0
+
+    # SingularInfo creates a vocative because it can
+    # work it out, but BuNaMo knows it does not exist.
+    assert len(clárú.sgVoc) == 0 or (len(clárú.sgVoc) == 1 and clárú.sgVoc[0].value == 'clárú')
+
     assert len(clárú.sgDat) == 1
     assert clárú.sgDat[0].value == 'clárú'
     assert len(clárú.plNom) == 0
