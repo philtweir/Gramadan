@@ -5,8 +5,10 @@ from io import StringIO
 from typing import Optional
 import shutil
 
+# This is an awful way to import Python, but it keeps us equivalent
+# to the C# workflow for the moment (exception for the tester only).
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
-from Gramadan import *
+from gramadan import *
 
 from .testpossessives import TestPossessives
 from .consistency import Consistency

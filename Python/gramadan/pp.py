@@ -733,7 +733,7 @@ class PP:
 
     # Constructs a prepositional phrase from an XML file in BuNaMo format:
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET.ElementTree]) -> PP:
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> PP:
         if isinstance(doc, str):
             xml = ET.parse(doc)
             return cls.create_from_xml(xml)

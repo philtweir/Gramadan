@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "gramadan-py"
+version = "0.1.0"
+description = "Pure Python implementation of michmech's C# Gramadán utility for manipulating the Irish National Morphology Database"
+authors = ["Michal Měchura <mech@lexiconista.com>", "Phil Weir (Python conversion) <phil.t.weir@gmail.com>"]
+license = "MIT"
+packages = [
+    { include = "gramadan" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+lxml = "^4.7.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.5"
+lxml-stubs = "^0.3.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
