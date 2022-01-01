@@ -1,21 +1,24 @@
-﻿import xml.etree.ElementTree as ET
+﻿from __future__ import annotations
+
+from lxml import etree as ET
 from typing import Optional, Union
-from features import Mutation, Form
+from .utils import Utils
+from .features import Mutation, Form
 
 # A possessive pronoun:
 class Possessive:
     disambig: str = ""
 
-    def getNickname() -> str:
-        ret: str = getLemma()
+    def getNickname(self) -> str:
+        ret: str = self.getLemma()
         if self.disambig != "":
             ret += " " + self.disambig
         ret += " poss"
-        ret = ret.Replace(" ", "_")
+        ret = ret.replace(" ", "_")
         return ret
 
-    def getFriendlyNickname() -> str:
-        ret: str = getLemma()
+    def getFriendlyNickname(self) -> str:
+        ret: str = self.getLemma()
         if self.disambig != "":
             ret += " (" + self.disambig + ")"
         return ret
@@ -25,6 +28,7 @@ class Possessive:
         full: Optional[list[Form]],
         apos: Optional[list[Form]],
         mutation: Mutation = Mutation.Nil,
+        disambig: str = "",
     ):
         # Its forms:
         self.full: list[Form] = []
@@ -37,61 +41,63 @@ class Possessive:
         # The mutation it causes:
         self.mutation = mutation
 
+        self.disambig = disambig
+
     # Returns the noun's lemma:
-    def getLemma() -> str:
+    def getLemma(self) -> str:
         ret: str = ""
         lemmaForm: Form = self.full[0]
-        if lemmaForm != null:
+        # PTW: is this possible? surely it'd be an empty list
+        if lemmaForm != None:
             ret = lemmaForm.value
         return ret
 
     # Constructors:
     @classmethod
-    def create_from_string_and_mutation(cls, s: str, mutation: Mutation):
+    def create_from_string_and_mutation(cls, s: str, mutation: Mutation) -> Possessive:
         return cls(full=[Form(s)], apos=[Form(s)], mutation=mutation)
 
     @classmethod
-    def create_from_strings_and_mutation(cls, full: str, apos: str, mutation: Mutation):
+    def create_from_strings_and_mutation(
+        cls, full: str, apos: str, mutation: Mutation
+    ) -> Possessive:
         return cls(full=[Form(full)], apos=[Form(apos)], mutation=mutation)
 
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET.ElementTree]):
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> Possessive:
         if isinstance(doc, str):
             xml = ET.parse(doc)
             return cls.create_from_xml(xml)
 
         root = doc.getroot()
-        disambig = root.get("disambig")
-        mutation = Mutation.Parse(
-            typeof(Mutation), Utils.UpperInit(root.get("mutation"))
-        )
+        disambig = root.get("disambig", "")
+        mutation = Mutation(Utils.UpperInit(root.get("mutation", "")))
         full: list[Form] = []
         apos: list[Form] = []
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/full"):
-            full.append(Form(el.get("default")))
+        el: ET._Element
+        for el in root.findall("./full"):
+            full.append(Form(el.get("default", "")))
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/apos"):
-            apos.append(Form(el.get("default")))
+        for el in root.findall("./apos"):
+            apos.append(Form(el.get("default", "")))
 
         return cls(full=full, apos=apos, mutation=mutation, disambig=disambig)
 
     # Prints the possessive pronoun in BuNaMo format:
-    def printXml() -> ET.ElementTree:
-        root: ET.Element = ET.Element("possessive")
-        doc: ET.ElementTree = ET.ElementTree(root)
+    def printXml(self) -> ET._ElementTree:
+        root: ET._Element = ET.Element("possessive")
+        doc: ET._ElementTree = ET.ElementTree(root)
         root.set("default", self.getLemma())
         root.set("disambig", self.disambig)
-        root.set("mutation", Utils.LowerInit(self.mutation.ToString()))
+        root.set("mutation", Utils.LowerInit(self.mutation.value))
 
         f: Form
+
         for f in self.full:
             el = ET.SubElement(root, "full")
             el.set("default", f.value)
 
-        f: Form
         for f in self.apos:
             el = ET.SubElement(root, "apos")
             el.set("default", f.value)

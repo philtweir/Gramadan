@@ -1,5 +1,7 @@
-﻿from dataclasses import dataclass, field
-from features import FormSg, Form, FormPlGen, Gender
+﻿import re
+from dataclasses import dataclass, field
+from .opers import Opers
+from .features import FormSg, Form, FormPlGen, Gender
 
 # A class that encapsulates the singular forms of a noun or adjective:
 @dataclass
@@ -10,7 +12,7 @@ class SingularInfo:
     vocative: list[Form] = field(default_factory=list)
     dative: list[Form] = field(default_factory=list)
 
-    def print() -> str:
+    def print(self) -> str:
         ret: str = ""
         ret += "NOM: "
         f: Form
@@ -18,17 +20,17 @@ class SingularInfo:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "GEN: "
-        f: Form
+
         for f in self.genitive:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "VOC: "
-        f: Form
+
         for f in self.vocative:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "DAT: "
-        f: Form
+
         for f in self.dative:
             ret += "[" + f.value + "] "
         ret += "\n"
@@ -37,7 +39,7 @@ class SingularInfo:
 
 # Singular class O: all cases are identical.
 class SingularInfoO(SingularInfo):
-    def __init__(lemma: str, gender: Gender):
+    def __init__(self, lemma: str, gender: Gender):
         super().__init__(gender=gender)
         self.nominative.append(Form(lemma))
         self.genitive.append(Form(lemma))
@@ -56,7 +58,7 @@ class SingularInfoC(SingularInfo):
         form: str = lemma
         form = re.sub("ch$", "gh", form)
         # eg. bacach > bacaigh
-        form = Opers.Slenderize(form, slenderizationTarget)
+        form = Opers.SlenderizeWithTarget(form, slenderizationTarget)
         if gender == Gender.Fem:
             self.vocative.append(Form(lemma))
         else:
@@ -70,7 +72,7 @@ class SingularInfoC(SingularInfo):
 
 # Singular class L: genitive formed by broadening.
 class SingularInfoL(SingularInfo):
-    def __init__(lemma: str, gender: Gender, broadeningTarget: str = ""):
+    def __init__(self, lemma: str, gender: Gender, broadeningTarget: str = ""):
         super().__init__(gender=gender)
         self.nominative.append(Form(lemma))
         self.vocative.append(Form(lemma))
@@ -78,13 +80,14 @@ class SingularInfoL(SingularInfo):
 
         # derive the genitive:
         form: str = lemma
-        form = Opers.Broaden(form, broadeningTarget)
+        form = Opers.BroadenWithTarget(form, broadeningTarget)
         self.genitive.append(Form(form))
 
 
 # Singular class E: genitive formed by suffix "-e".
 class SingularInfoE(SingularInfo):
     def __init__(
+        self,
         lemma: str,
         gender: Gender,
         syncope: bool,
@@ -99,7 +102,7 @@ class SingularInfoE(SingularInfo):
         form: str = lemma
         if syncope:
             form = Opers.Syncope(form)
-        form = Opers.Slenderize(form, slenderizationTarget)
+        form = Opers.SlenderizeWithTarget(form, slenderizationTarget)
         if not doubleDative:
             self.dative.append(Form(lemma))
         else:
@@ -107,7 +110,7 @@ class SingularInfoE(SingularInfo):
             self.dative.append(Form(form))
 
         # continue deriving the genitive:
-        form = re.sub("([" + Opers.VowelsSlender + "])ngt$", "$1ngth", form)
+        form = re.sub("([" + Opers.VowelsSlender + "])ngt$", r"\1ngth", form)
         # eg. tarraingt > tarraingthe
         form = re.sub("ú$", "aith", form)
         # eg. scrúdú > scrúdaithe
@@ -127,15 +130,15 @@ class SingularInfoA(SingularInfo):
 
         # derive the genitive:
         form: str = lemma
-        form = re.sub("([" + Opers.VowelsSlender + "])rt$", "$1rth", form)
+        form = re.sub("([" + Opers.VowelsSlender + "])rt$", r"\1rth", form)
         # eg. bagairt > bagartha
-        form = re.sub("([" + Opers.VowelsSlender + "])nnt$", "$1nn", form)
+        form = re.sub("([" + Opers.VowelsSlender + "])nnt$", r"\1nn", form)
         # eg. cionnroinnt > cionnranna
-        form = re.sub("([" + Opers.VowelsSlender + "])nt$", "$1n", form)
+        form = re.sub("([" + Opers.VowelsSlender + "])nt$", r"\1n", form)
         # eg. canúint > canúna
         if syncope:
             form = Opers.Syncope(form)
-        form = Opers.Broaden(form, broadeningTarget)
+        form = Opers.BroadenWithTarget(form, broadeningTarget)
         form = form + "a"
         self.genitive.append(Form(form))
 
@@ -150,16 +153,16 @@ class SingularInfoD(SingularInfo):
 
         # derive the genitive:
         form: str = lemma
-        form = re.sub("([" + Opers.VowelsBroad + "])$", "$1d", form)
+        form = re.sub("([" + Opers.VowelsBroad + "])$", r"\1d", form)
         # eg. cara > carad
-        form = re.sub("([" + Opers.VowelsSlender + "])$", "$1ad", form)
+        form = re.sub("([" + Opers.VowelsSlender + "])$", r"\1ad", form)
         # eg. fiche > fichead
         self.genitive.append(Form(form))
 
 
 # Singular class N: genitive ends in "-n".
 class SingularInfoN(SingularInfo):
-    def __init__(lemma: str, gender: Gender):
+    def __init__(self, lemma: str, gender: Gender):
         super().__init__(gender=gender)
         self.nominative.append(Form(lemma))
         self.vocative.append(Form(lemma))
@@ -167,8 +170,8 @@ class SingularInfoN(SingularInfo):
 
         # derive the genitive:
         form: str = lemma
-        form = re.sub("([" + Opers.VowelsBroad + "])$", "$1n", form)
-        form = re.sub("([" + Opers.VowelsSlender + "])$", "$1an", form)
+        form = re.sub("([" + Opers.VowelsBroad + "])$", r"\1n", form)
+        form = re.sub("([" + Opers.VowelsSlender + "])$", r"\1an", form)
         self.genitive.append(Form(form))
 
 
@@ -186,7 +189,7 @@ class SingularInfoEAX(SingularInfo):
         form: str = lemma
         if syncope:
             form = Opers.Syncope(form)
-        form = Opers.Slenderize(form, slenderizationTarget)
+        form = Opers.SlenderizeWithTarget(form, slenderizationTarget)
         form = form + "each"
         self.genitive.append(Form(form))
 
@@ -205,6 +208,6 @@ class SingularInfoAX(SingularInfo):
         form: str = lemma
         if syncope:
             form = Opers.Syncope(form)
-        form = Opers.Broaden(form, broadeningTarget)
+        form = Opers.BroadenWithTarget(form, broadeningTarget)
         form = form + "ach"
         self.genitive.append(Form(form))

@@ -1,5 +1,7 @@
-﻿from dataclasses import dataclass, field
-from features import FormSg, Form, FormPlGen, Strength
+﻿import re
+from dataclasses import dataclass, field
+from .features import FormSg, Form, FormPlGen, Strength
+from .opers import Opers
 
 
 @dataclass
@@ -9,7 +11,7 @@ class PluralInfo:
     genitive: list[Form] = field(default_factory=list)
     vocative: list[Form] = field(default_factory=list)
 
-    def print() -> str:
+    def print(self) -> str:
         ret: str = ""
         ret += "NOM: "
         f: Form
@@ -17,12 +19,12 @@ class PluralInfo:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "GEN: "
-        f: Form
+
         for f in self.genitive:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "VOC: "
-        f: Form
+
         for f in self.vocative:
             ret += "[" + f.value + "] "
         ret += "\n"
@@ -44,9 +46,9 @@ class PluralInfoLgC(PluralInfo):
 
         # generate the nominative:
         form = bayse
-        form = Regex.Replace(form, "ch$", "gh")
+        form = re.sub("ch$", "gh", form)
         # eg. bacach > bacaigh
-        form = Opers.Slenderize(form, slenderizationTarget)
+        form = Opers.SlenderizeWithTarget(form, slenderizationTarget)
         self.nominative.append(Form(form))
 
 
@@ -56,7 +58,7 @@ class PluralInfoLgE(PluralInfo):
         super().__init__(strength=Strength.Weak)
 
         form: str = bayse
-        form = Opers.Slenderize(form, slenderizationTarget) + "e"
+        form = Opers.SlenderizeWithTarget(form, slenderizationTarget) + "e"
 
         self.nominative.append(Form(form))
         self.genitive.append(Form(Opers.Broaden(bayse)))
@@ -65,11 +67,11 @@ class PluralInfoLgE(PluralInfo):
 
 # Plural class LgA: weak, plural formed by suffix "-a".
 class PluralInfoLgA(PluralInfo):
-    def __init__(bayse: str, broadeningTarget: str = ""):
+    def __init__(self, bayse: str, broadeningTarget: str = ""):
         super().__init__(strength=Strength.Weak)
 
         form: str = bayse
-        form = Opers.Broaden(form, broadeningTarget) + "a"
+        form = Opers.BroadenWithTarget(form, broadeningTarget) + "a"
 
         self.nominative.append(Form(form))
         self.genitive.append(Form(Opers.Broaden(bayse)))
@@ -78,7 +80,7 @@ class PluralInfoLgA(PluralInfo):
 
 # Plural class Tr: strong.
 class PluralInfoTr(PluralInfo):
-    def __init__(bayse: str):
+    def __init__(self, bayse: str):
         super().__init__(strength=Strength.Strong)
         self.nominative.append(Form(bayse))
         self.genitive.append(Form(bayse))

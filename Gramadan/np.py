@@ -1,19 +1,39 @@
-﻿import xml.etree.ElementTree as ET
+﻿from __future__ import annotations
+
+from lxml import etree as ET
 from typing import Optional, Union
-from features import Gender, Mutation, FormSg, Form
-from noun import Noun
-from possessive import Possessive
-from adjective import Adjective
+from .features import Gender, Mutation, FormSg, Form, FormPlGen, Strength
+from .noun import Noun
+from .opers import Opers
+from .possessive import Possessive
+from .adjective import Adjective
 
 # A class for a noun phrase:
 class NP:
     disambig: str = ""
 
-    def getNickname() -> str:
+    isImmutable: bool = False
+
+    forceNominative: bool = False
+
+    # Returns the noun phrase's lemma:
+    def getLemma(self) -> str:
+        ret: str = ""
+        if len(self.sgNom) != 0:
+            ret = self.sgNom[0].value
+        if ret == "" and len(self.sgNomArt) != 0:
+            ret = self.sgNomArt[0].value
+        if ret == "" and len(self.plNom) != 0:
+            ret = self.plNom[0].value
+        if ret == "" and len(self.plNomArt) != 0:
+            ret = self.plNomArt[0].value
+        return ret
+
+    def getNickname(self) -> str:
         ret: str = self.getLemma() + " NP"
         if self.disambig != "":
             ret += " " + self.disambig
-        ret = ret.Replace(" ", "_")
+        ret = ret.replace(" ", "_")
         return ret
 
     def __init__(
@@ -102,31 +122,18 @@ class NP:
 
         self.disambig = disambig
 
-    # Returns the noun phrase's lemma:
-    def getLemma() -> str:
-        ret: str = ""
-        if self.sgNom.Count != 0:
-            ret = self.sgNom[0].value
-        if ret == "" and self.sgNomArt.Count != 0:
-            ret = self.sgNomArt[0].value
-        if ret == "" and self.plNom.Count != 0:
-            ret = self.plNom[0].value
-        if ret == "" and self.plNomArt.Count != 0:
-            ret = self.plNomArt[0].value
-        return ret
-
     # Returns the noun phrase's gender:
     def getGender(self) -> Gender:
         ret: Gender = Gender.Masc
-        if self.sgNom.Count != 0:
+        if len(self.sgNom) != 0:
             ret = self.sgNom[0].gender
-        elif self.sgNomArt.Count != 0:
+        elif len(self.sgNomArt) != 0:
             ret = self.sgNomArt[0].gender
         return ret
 
     def hasGender(self) -> bool:
         ret: bool = False
-        if self.sgNom.Count != 0 or self.sgNomArt.Count != 0:
+        if len(self.sgNom) != 0 or len(self.sgNomArt) != 0:
             ret = True
         return ret
 
@@ -139,130 +146,142 @@ class NP:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "sgGen: "
-        f: Form
+
         for f in self.sgGen:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "plNom: "
-        f: Form
+
         for f in self.plNom:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "plGen: "
-        f: Form
+
         for f in self.plGen:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "sgNomArt: "
-        f: Form
+
         for f in self.sgNomArt:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "sgGenArt: "
-        f: Form
+
         for f in self.sgGenArt:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "plNomArt: "
-        f: Form
+
         for f in self.plNomArt:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "plGenArt: "
-        f: Form
+
         for f in self.plGenArt:
             ret += "[" + f.value + "] "
-        ret += "\n"
-        ret += Environment.NewLine
+
+        ret += "\n\n"
+        # ---
+
         ret += "sgDat: "
-        f: Form
+
         for f in self.sgDat:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "sgDatArtN: "
-        f: Form
+
         for f in self.sgDatArtN:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "sgDatArtS: "
-        f: Form
+
         for f in self.sgDatArtS:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "plDat: "
-        f: Form
+
         for f in self.plDat:
             ret += "[" + f.value + "] "
         ret += "\n"
         ret += "plDatArt: "
-        f: Form
+
         for f in self.plDatArt:
             ret += "[" + f.value + "] "
         ret += "\n"
         return ret
 
     # Creates a noun phrase from an explicit listing of all the basic forms:
+    @classmethod
     def create(
-        gender: Gender, sgNom: str, sgGen: str, plNom: str, plGen: str, sgDatArtN: str
+        cls,
+        gender: Gender,
+        sgNomStr: str,
+        sgGenStr: str,
+        plNomStr: str,
+        plGenStr: str,
+        sgDatArtNStr: str,
     ):
         # region singular-nominative
         # without article:
-        sgNom = [FormSg(sgNom, gender)]
+        sgNom: list[FormSg] = [FormSg(sgNomStr, gender)]
         # { # with article:
-        mut: Mutation = Mutation.PrefT if gender == Gender.Masc else Mutation.Len3
-        value: str = "an " + Opers.Mutate(mut, sgNom)
-        sgNomArt = [FormSg(value, gender)]
+        value: str
+        mut: Mutation
+
+        mut = Mutation.PrefT if gender == Gender.Masc else Mutation.Len3
+        value = "an " + Opers.Mutate(mut, sgNomStr)
+        sgNomArt: list[FormSg] = [FormSg(value, gender)]
         # }
         # endregion
         # region singular-genitive
         # { # without article:
-        value: str = sgNom
-        sgGen = [FormSg(value, gender)]
+        sgGen: list[FormSg] = [FormSg(sgNomStr, gender)]
         # }
         # { # with article:
-        mut: Mutation = Mutation.Len3 if gender == Gender.Masc else Mutation.PrefH
+        mut = Mutation.Len3 if gender == Gender.Masc else Mutation.PrefH
         article: str = "an" if gender == Gender.Masc else "na"
-        value: str = article + " " + Opers.Mutate(mut, sgGen)
-        sgGenArt = [FormSg(value, gender)]
+        value = article + " " + Opers.Mutate(mut, sgGenStr)
+        sgGenArt: list[FormSg] = [FormSg(value, gender)]
         # }
         # endregion
         # region plural-nominative
         # { # without article:
-        plNom = [Form(plNom)]
+        plNom: list[Form] = [Form(plNomStr)]
         # }
         # { # with article:
-        value: str = "na " + Opers.Mutate(Mutation.PrefH, plNom)
-        plNomArt = [Form(value)]
+        value = "na " + Opers.Mutate(Mutation.PrefH, plNomStr)
+        plNomArt: list[Form] = [Form(value)]
         # }
         # endregion
         # region plural-genitive
         # { # without article:
-        plGen = [Form(plNom)]
+        plGen: list[Form] = [Form(plNomStr)]
         # }
         # { # with article:
-        value: str = "na " + Opers.Mutate(Mutation.Ecl1, plGen)
-        plGenArt = [Form(value)]
+        value = "na " + Opers.Mutate(Mutation.Ecl1, plGenStr)
+        plGenArt: list[Form] = [Form(value)]
         # }
         # endregion
         # region singular-dative
         # { # without article:
-        sgDat = [FormSg(sgNom, gender)]
+        sgDat: list[FormSg] = [FormSg(sgNomStr, gender)]
         # }
         # { # with article:
-        sgDatArtN = [FormSg(sgDatArtN, gender)]
-        sgDatArtS = [FormSg(sgNom, gender)]
+        sgDatArtN: list[FormSg] = [FormSg(sgDatArtNStr, gender)]
+        sgDatArtS: list[FormSg] = [FormSg(sgNomStr, gender)]  # PTW: yes, nominative
 
-        mut: Mutation = Mutation.PrefT if gender == Gender.Masc else Mutation.Len3
-        value: str = "an " + Opers.Mutate(mut, sgNom)
-        sgNomArt = [FormSg(value, gender)]
+        mut = Mutation.PrefT if gender == Gender.Masc else Mutation.Len3
+        value = "an " + Opers.Mutate(mut, sgNomStr)
+        # PTW: TODO - not entirely clear why sgNomArt is being appended to here... (but true in CS also l152)
+        sgNomArt.append(FormSg(value, gender))
         # }
         # endregion
         # region plural-dative
         # { # without article:
-        plDat = [Form(plNom)]
+        plDat = [Form(plNomStr)]
         # }
         # { # with article:
-        plDatArt = [Form(plNom)]
+        plDatArt = [Form(plNomStr)]
         # }
         # endregion
         return cls(
@@ -279,15 +298,16 @@ class NP:
             plNomArt=plNomArt,
             plGenArt=plGenArt,
             plDatArt=plDatArt,
-            isDefinite=isDefinite,
-            isPossessed=isPossessed,
-            isImmutable=isImmutable,
-            forceNominative=forceNominative,
+            # PTW: TODO - are the below always default here?
+            # isDefinite=isDefinite,
+            # isPossessed=isPossessed,
+            # isImmutable=isImmutable,
+            # forceNominative=forceNominative,
         )
 
     # Creates a noun phrase from a noun determined by a possessive pronoun:
     @classmethod
-    def create_from_possessive(cls, head: Noun, poss: Possessive) -> "NP":
+    def create_from_possessive(cls, head: Noun, poss: Possessive) -> NP:
         np = cls.create_from_noun(head)
         np._makePossessive(poss)
         return np
@@ -296,106 +316,126 @@ class NP:
     @classmethod
     def create_from_noun_adjective_possessive(
         cls, head: Noun, mod: Adjective, poss: Possessive
-    ) -> "NP":
-        np = cls.create_from_noun_adjective(noun, mod)
+    ) -> NP:
+        np = cls.create_from_noun_adjective(head, mod)
         np._makePossessive(poss)
         return np
 
     # Creates a noun phrase from a noun:
     @classmethod
-    def create_from_noun(head: Noun) -> "NP":
+    def create_from_noun(cls, head: Noun) -> NP:
         isDefinite = head.isDefinite
         isImmutable = head.isImmutable
         # region singular-nominative
-        headForm: FormSg
-        for headForm in head.sgNom:
-            # without article:
-            sgNom.append(FormSg(headForm.value, headForm.gender))
+        headFormSg: FormSg  # naturally, these could be together, but
+        headForm: Form  # this is very helpful for checking
+        headFormPlGen: FormPlGen
+        sgNom: list[FormSg] = []
+        sgGen: list[FormSg] = []
+        sgDat: list[FormSg] = []
+        sgNomArt: list[FormSg] = []
+        sgGenArt: list[FormSg] = []
+        sgDatArtN: list[FormSg] = []
+        sgDatArtS: list[FormSg] = []
+        plNom: list[Form] = []
+        plGen: list[Form] = []
+        plDat: list[Form] = []
+        plNomArt: list[Form] = []
+        plGenArt: list[Form] = []
+        plDatArt: list[Form] = []
 
-        if not head.isDefinite:  # with article:
-            mut: Mutation = (
-                Mutation.PrefT if headForm.gender == Gender.Masc else Mutation.Len3
-            )
-            if head.isImmutable:
-                mut = Mutation.Nil
-            value: str = "an " + Opers.Mutate(mut, headForm.value)
-            sgNomArt.append(FormSg(value, headForm.gender))
+        article: str
+        value: str
+        mut: Mutation
+
+        for headFormSg in head.sgNom:
+            # without article:
+            sgNom.append(FormSg(headFormSg.value, headFormSg.gender))
+
+            if not head.isDefinite:  # with article:
+                mut = (
+                    Mutation.PrefT
+                    if headFormSg.gender == Gender.Masc
+                    else Mutation.Len3
+                )
+                if head.isImmutable:
+                    mut = Mutation.Nil
+                value = "an " + Opers.Mutate(mut, headFormSg.value)
+                sgNomArt.append(FormSg(value, headFormSg.gender))
 
         # endregion
         # region singular-genitive
-        headForm: FormSg
-        for headForm in head.sgGen:
+        for headFormSg in head.sgGen:
             # without article:
-            mut: Mutation = Mutation.Len1 if head.isProper else Mutation.Nil
+            mut = Mutation.Len1 if head.isProper else Mutation.Nil
             # proper nouns are always lenited in the genitive
             if head.isImmutable:
                 mut = Mutation.Nil
-            value: str = Opers.Mutate(mut, headForm.value)
-            sgGen.append(FormSg(value, headForm.gender))
+            value = Opers.Mutate(mut, headFormSg.value)
+            sgGen.append(FormSg(value, headFormSg.gender))
 
-        # with article:
-        if not head.isDefinite or head.allowArticledGenitive:
-            mut: Mutation = (
-                Mutation.Len3 if headForm.gender == Gender.Masc else Mutation.PrefH
-            )
-            if head.isImmutable:
-                mut = Mutation.Nil
-            article: str = "an" if headForm.gender == Gender.Masc else "na"
-            value: str = article + " " + Opers.Mutate(mut, headForm.value)
-            sgGenArt.append(FormSg(value, headForm.gender))
+            # with article:
+            if not head.isDefinite or head.allowArticledGenitive:
+                mut = (
+                    Mutation.Len3
+                    if headFormSg.gender == Gender.Masc
+                    else Mutation.PrefH
+                )
+                if head.isImmutable:
+                    mut = Mutation.Nil
+                article = "an" if headFormSg.gender == Gender.Masc else "na"
+                value = article + " " + Opers.Mutate(mut, headFormSg.value)
+                sgGenArt.append(FormSg(value, headFormSg.gender))
 
         # endregion
         # region plural-nominative
-        headForm: Form
         for headForm in head.plNom:
             # without article:
             plNom.append(Form(headForm.value))
 
-        if not head.isDefinite:  # with article:
-            mut: Mutation = Mutation.PrefH
-            if head.isImmutable:
-                mut = Mutation.Nil
-            value: str = "na " + Opers.Mutate(mut, headForm.value)
-            plNomArt.append(Form(value))
+            if not head.isDefinite:  # with article:
+                mut = Mutation.PrefH
+                if head.isImmutable:
+                    mut = Mutation.Nil
+                value = "na " + Opers.Mutate(mut, headForm.value)
+                plNomArt.append(Form(value))
 
         # endregion
         # region plural-genitive
-        headForm: Form
-        for headForm in head.plGen:
+        for headFormPlGen in head.plGen:
             # without article:
-            mut: Mutation = Mutation.Len1 if head.isProper else Mutation.Nil
+            mut = Mutation.Len1 if head.isProper else Mutation.Nil
             # proper nouns are always lenited in the articleless genitive
             if head.isImmutable:
                 mut = Mutation.Nil
-            value: str = Opers.Mutate(mut, headForm.value)
+            value = Opers.Mutate(mut, headFormPlGen.value)
             plGen.append(Form(value))
 
-        if not head.isDefinite or head.allowArticledGenitive:  # with article:
-            mut: Mutation = Mutation.Ecl1
-            if head.isImmutable:
-                mut = Mutation.Nil
-            value: str = "na " + Opers.Mutate(mut, headForm.value)
-            plGenArt.append(Form(value))
+            if not head.isDefinite or head.allowArticledGenitive:  # with article:
+                mut = Mutation.Ecl1
+                if head.isImmutable:
+                    mut = Mutation.Nil
+                value = "na " + Opers.Mutate(mut, headFormPlGen.value)
+                plGenArt.append(Form(value))
 
         # endregion
         # region singular-dative
-        headForm: FormSg
-        for headForm in head.sgDat:
+        for headFormSg in head.sgDat:
             # without article:
-            sgDat.append(FormSg(headForm.value, headForm.gender))
+            sgDat.append(FormSg(headFormSg.value, headFormSg.gender))
 
-        if not head.isDefinite:  # with article:
-            sgDatArtN.append(FormSg(headForm.value, headForm.gender))
-            sgDatArtS.append(FormSg(headForm.value, headForm.gender))
+            if not head.isDefinite:  # with article:
+                sgDatArtN.append(FormSg(headFormSg.value, headFormSg.gender))
+                sgDatArtS.append(FormSg(headFormSg.value, headFormSg.gender))
 
         # endregion
         # region plural-dative
-        headForm: Form
         for headForm in head.plNom:
             # without article:
             plDat.append(Form(headForm.value))
-        if not head.isDefinite:  # with article:
-            plDatArt.append(Form(headForm.value))
+            if not head.isDefinite:  # with article:
+                plDatArt.append(Form(headForm.value))
+
         # endregion
         return cls(
             sgNom=sgNom,
@@ -412,14 +452,14 @@ class NP:
             plGenArt=plGenArt,
             plDatArt=plDatArt,
             isDefinite=isDefinite,
-            isPossessed=isPossessed,
             isImmutable=isImmutable,
-            forceNominative=forceNominative,
+            # isPossessed=isPossessed,   # PTW: sure these are default?
+            # forceNominative=forceNominative,
         )
 
     # Creates a noun phrase from a noun modified by an adjective:
     @classmethod
-    def create_from_noun_adjective(cls, head: Noun, mod: Adjective):
+    def create_from_noun_adjective(cls, head: Noun, mod: Adjective) -> NP:
         if mod.isPre:
             prefixedHead: Noun = Noun.create_from_xml(head.printXml())
             # create a copy of the head noun
@@ -427,29 +467,31 @@ class NP:
             f: Form
             for f in prefixedHead.sgNom:
                 f.value = Opers.Prefix(prefix, f.value)
-            f: Form
+
             for f in prefixedHead.sgGen:
                 f.value = Opers.Prefix(prefix, f.value)
-            f: Form
+
             for f in prefixedHead.sgDat:
                 f.value = Opers.Prefix(prefix, f.value)
-            f: Form
+
             for f in prefixedHead.sgVoc:
                 f.value = Opers.Prefix(prefix, f.value)
-            f: Form
+
             for f in prefixedHead.plNom:
                 f.value = Opers.Prefix(prefix, f.value)
-            f: Form
+
             for f in prefixedHead.plGen:
                 f.value = Opers.Prefix(prefix, f.value)
-            f: Form
+
             for f in prefixedHead.plVoc:
                 f.value = Opers.Prefix(prefix, f.value)
-            f: Form
+
             for f in prefixedHead.count:
                 f.value = Opers.Prefix(prefix, f.value)
-            np = cls.create_from_noun(prefixedHead)
-            isDefinite = np.isDefinite
+            np: NP = cls.create_from_noun(prefixedHead)
+            isDefinite: bool = np.isDefinite
+            isImmutable: bool = cls.isImmutable  # PTW: use the default
+            forceNominative: bool = cls.forceNominative
             sgNom = np.sgNom
             sgNomArt = np.sgNomArt
             sgGen = np.sgGen
@@ -481,132 +523,127 @@ class NP:
             plDat = []
             plDatArt = []
             # region singular-nominative
-            headForm: FormSg
-            for headForm in head.sgNom:
+            headFormSg: FormSg
+            modForm: Form
+            modForms: list[Form]
+            mutA: Mutation
+            mutN: Mutation
+            value: str
+            article: str
+
+            for headFormSg in head.sgNom:
                 # without article:
-                modForm: Form
                 for modForm in mod.sgNom:
-                    mutA: Mutation = (
+                    mutA = (
                         Mutation.Nil
-                        if headForm.gender == Gender.Masc
+                        if headFormSg.gender == Gender.Masc
                         else Mutation.Len1
                     )
-                    value: str = (
-                        headForm.value + " " + Opers.Mutate(mutA, modForm.value)
-                    )
-                    sgNom.append(FormSg(value, headForm.gender))
+                    value = headFormSg.value + " " + Opers.Mutate(mutA, modForm.value)
+                    sgNom.append(FormSg(value, headFormSg.gender))
 
                 if not head.isDefinite:  # with article:
-                    modForm: Form
                     for modForm in mod.sgNom:
-                        mutN: Mutation = (
+                        mutN = (
                             Mutation.PrefT
-                            if headForm.gender == Gender.Masc
+                            if headFormSg.gender == Gender.Masc
                             else Mutation.Len3
                         )
                         if head.isImmutable:
                             mutN = Mutation.Nil
-                        mutA: Mutation = (
+                        mutA = (
                             Mutation.Nil
-                            if headForm.gender == Gender.Masc
+                            if headFormSg.gender == Gender.Masc
                             else Mutation.Len1
                         )
-                        value: str = (
+                        value = (
                             "an "
-                            + Opers.Mutate(mutN, headForm.value)
+                            + Opers.Mutate(mutN, headFormSg.value)
                             + " "
                             + Opers.Mutate(mutA, modForm.value)
                         )
-                        sgNomArt.append(FormSg(value, headForm.gender))
+                        sgNomArt.append(FormSg(value, headFormSg.gender))
 
             # endregion
             # region singular-genitive
-            headForm: FormSg
-            for headForm in head.sgGen:
+            for headFormSg in head.sgGen:
                 # without article:
-                modForms: list[Form] = (
-                    mod.sgGenMasc if headForm.gender == Gender.Masc else mod.sgGenFem
+                modForms = (
+                    mod.sgGenMasc if headFormSg.gender == Gender.Masc else mod.sgGenFem
                 )
-                modForm: Form
                 for modForm in modForms:
-                    mutN: Mutation = Mutation.Len1 if head.isProper else Mutation.Nil
+                    mutN = Mutation.Len1 if head.isProper else Mutation.Nil
                     # proper nouns are always lenited in the genitive
                     if head.isImmutable:
                         mutN = Mutation.Nil
-                    mutA: Mutation = (
+                    mutA = (
                         Mutation.Len1
-                        if headForm.gender == Gender.Masc
+                        if headFormSg.gender == Gender.Masc
                         else Mutation.Nil
                     )
-                    value: str = (
-                        Opers.Mutate(mutN, headForm.value)
+                    value = (
+                        Opers.Mutate(mutN, headFormSg.value)
                         + " "
                         + Opers.Mutate(mutA, modForm.value)
                     )
-                    sgGen.append(FormSg(value, headForm.gender))
+                    sgGen.append(FormSg(value, headFormSg.gender))
 
-            headForm: FormSg
-            for headForm in head.sgGen:
+            for headFormSg in head.sgGen:
                 # with article:
                 if not head.isDefinite or head.allowArticledGenitive:
-                    modForms: list[Form] = (
+                    modForms = (
                         mod.sgGenMasc
-                        if headForm.gender == Gender.Masc
+                        if headFormSg.gender == Gender.Masc
                         else mod.sgGenFem
                     )
-                    modForm: Form
                     for modForm in modForms:
-                        mutN: Mutation = (
+                        mutN = (
                             Mutation.Len3
-                            if headForm.gender == Gender.Masc
+                            if headFormSg.gender == Gender.Masc
                             else Mutation.PrefH
                         )
                         if head.isImmutable:
                             mutN = Mutation.Nil
-                        mutA: Mutation = (
+                        mutA = (
                             Mutation.Len1
-                            if headForm.gender == Gender.Masc
+                            if headFormSg.gender == Gender.Masc
                             else Mutation.Nil
                         )
-                        article: str = "an" if headForm.gender == Gender.Masc else "na"
-                        value: str = (
+                        article = "an" if headFormSg.gender == Gender.Masc else "na"
+                        value = (
                             article
                             + " "
-                            + Opers.Mutate(mutN, headForm.value)
+                            + Opers.Mutate(mutN, headFormSg.value)
                             + " "
                             + Opers.Mutate(mutA, modForm.value)
                         )
-                        sgGenArt.append(FormSg(value, headForm.gender))
+                        sgGenArt.append(FormSg(value, headFormSg.gender))
 
             # endregion
             # region plural-nominative
             headForm: Form
             for headForm in head.plNom:
                 # without article:
-                modForm: Form
                 for modForm in mod.plNom:
-                    mutA: Mutation = (
+                    mutA = (
                         Mutation.Len1
                         if Opers.IsSlender(headForm.value)
                         else Mutation.Nil
                     )
-                    value: str = (
-                        headForm.value + " " + Opers.Mutate(mutA, modForm.value)
-                    )
+                    value = headForm.value + " " + Opers.Mutate(mutA, modForm.value)
                     plNom.append(Form(value))
 
                 if not head.isDefinite:  # with article:
-                    modForm: Form
                     for modForm in mod.plNom:
-                        mutN: Mutation = Mutation.PrefH
+                        mutN = Mutation.PrefH
                         if head.isImmutable:
                             mutN = Mutation.Nil
-                        mutA: Mutation = (
+                        mutA = (
                             Mutation.Len1
                             if Opers.IsSlender(headForm.value)
                             else Mutation.Nil
                         )
-                        value: str = (
+                        value = (
                             "na "
                             + Opers.Mutate(mutN, headForm.value)
                             + " "
@@ -616,58 +653,59 @@ class NP:
 
             # endregion
             # region plural-genitive
-            headForm: FormPlGen
-            for headForm in head.plGen:
+            headFormPlGen: FormPlGen
+            for headFormPlGen in head.plGen:
                 # without article:
-                modForms: list[Form] = (
-                    mod.plNom if headForm.strength == Strength.Strong else mod.sgNom
+                modForms = (
+                    mod.plNom
+                    if headFormPlGen.strength == Strength.Strong
+                    else mod.sgNom
                 )
-                modForm: Form
                 for modForm in modForms:
-                    mutA: Mutation = (
+                    mutA = (
                         Mutation.Len1
-                        if Opers.IsSlender(headForm.value)
+                        if Opers.IsSlender(headFormPlGen.value)
                         else Mutation.Nil
                     )
-                    if headForm.strength == Strength.Weak:
+                    if headFormPlGen.strength == Strength.Weak:
                         mutA = (
                             Mutation.Len1
-                            if Opers.IsSlenderI(headForm.value)
+                            if Opers.IsSlenderI(headFormPlGen.value)
                             else Mutation.Nil
                         )
                         # "Gael", "captaen" are not slender
-                    value: str = (
-                        headForm.value + " " + Opers.Mutate(mutA, modForm.value)
+                    value = (
+                        headFormPlGen.value + " " + Opers.Mutate(mutA, modForm.value)
                     )
                     plGen.append(Form(value))
 
-            headForm: FormPlGen
-            for headForm in head.plGen:
+            for headFormPlGen in head.plGen:
                 # with article:
                 if not head.isDefinite or head.allowArticledGenitive:
-                    modForms: list[Form] = (
-                        mod.plNom if headForm.strength == Strength.Strong else mod.sgNom
+                    modForms = (
+                        mod.plNom
+                        if headFormPlGen.strength == Strength.Strong
+                        else mod.sgNom
                     )
-                    modForm: Form
                     for modForm in modForms:
-                        mutN: Mutation = Mutation.Ecl1
+                        mutN = Mutation.Ecl1
                         if head.isImmutable:
                             mutN = Mutation.Nil
-                        mutA: Mutation = (
+                        mutA = (
                             Mutation.Len1
-                            if Opers.IsSlender(headForm.value)
+                            if Opers.IsSlender(headFormPlGen.value)
                             else Mutation.Nil
                         )
-                        if headForm.strength == Strength.Weak:
+                        if headFormPlGen.strength == Strength.Weak:
                             mutA = (
                                 Mutation.Len1
-                                if Opers.IsSlenderI(headForm.value)
+                                if Opers.IsSlenderI(headFormPlGen.value)
                                 else Mutation.Nil
                             )
                             # "Gael", "captaen" are not slender
-                        value: str = (
+                        value = (
                             "na "
-                            + Opers.Mutate(mutN, headForm.value)
+                            + Opers.Mutate(mutN, headFormPlGen.value)
                             + " "
                             + Opers.Mutate(mutA, modForm.value)
                         )
@@ -675,71 +713,58 @@ class NP:
 
             # endregion
             # region singular-dative
-            headForm: FormSg
-            for headForm in head.sgDat:
+            for headFormSg in head.sgDat:
                 # without article:
-                modForm: Form
                 for modForm in mod.sgNom:
-                    mutA: Mutation = (
+                    mutA = (
                         Mutation.Nil
-                        if headForm.gender == Gender.Masc
+                        if headFormSg.gender == Gender.Masc
                         else Mutation.Len1
                     )
-                    value: str = (
-                        headForm.value + " " + Opers.Mutate(mutA, modForm.value)
-                    )
-                    sgDat.append(FormSg(value, headForm.gender))
+                    value = headFormSg.value + " " + Opers.Mutate(mutA, modForm.value)
+                    sgDat.append(FormSg(value, headFormSg.gender))
 
                 if not head.isDefinite:  # with article:
-                    modForm: Form
                     for modForm in mod.sgNom:
-                        mutA: Mutation = (
+                        mutA = (
                             Mutation.Nil
-                            if headForm.gender == Gender.Masc
+                            if headFormSg.gender == Gender.Masc
                             else Mutation.Len1
                         )
-                        value: str = (
-                            headForm.value + " " + Opers.Mutate(mutA, modForm.value)
+                        value = (
+                            headFormSg.value + " " + Opers.Mutate(mutA, modForm.value)
                         )
-                        sgDatArtS.append(FormSg(value, headForm.gender))
+                        sgDatArtS.append(FormSg(value, headFormSg.gender))
 
-                    modForm: Form
                     for modForm in mod.sgNom:
-                        value: str = (
-                            headForm.value
+                        value = (
+                            headFormSg.value
                             + " "
                             + Opers.Mutate(Mutation.Len1, modForm.value)
                         )
-                        sgDatArtN.append(FormSg(value, headForm.gender))
+                        sgDatArtN.append(FormSg(value, headFormSg.gender))
 
             # endregion
             # region plural-dative
-            headForm: Form
             for headForm in head.plNom:
                 # without article:
-                modForm: Form
                 for modForm in mod.plNom:
-                    mutA: Mutation = (
+                    mutA = (
                         Mutation.Len1
                         if Opers.IsSlender(headForm.value)
                         else Mutation.Nil
                     )
-                    value: str = (
-                        headForm.value + " " + Opers.Mutate(mutA, modForm.value)
-                    )
+                    value = headForm.value + " " + Opers.Mutate(mutA, modForm.value)
                     plDat.append(Form(value))
 
                 if not head.isDefinite:  # with article:
-                    modForm: Form
                     for modForm in mod.plNom:
-                        mutA: Mutation = (
+                        mutA = (
                             Mutation.Len1
                             if Opers.IsSlender(headForm.value)
                             else Mutation.Nil
                         )
-                        value: str = (
-                            headForm.value + " " + Opers.Mutate(mutA, modForm.value)
-                        )
+                        value = headForm.value + " " + Opers.Mutate(mutA, modForm.value)
                         plDatArt.append(Form(value))
 
                 # endregion
@@ -758,254 +783,226 @@ class NP:
             plGenArt=plGenArt,
             plDatArt=plDatArt,
             isDefinite=isDefinite,
-            isPossessed=isPossessed,
             isImmutable=isImmutable,
             forceNominative=forceNominative,
+            # isPossessed=isPossessed,
         )
 
-        # Constructor helper: Adds a possessive pronoun to sgNom, sgDat, sgGen, plNom, plDat, plGen of itself, empties all other forms:
-        def _makePossessive(self, poss: Possessive):
-            self.isDefinite = True
-            self.isPossessed = True
-            # region singular-nominative
-            headForm: FormSg
-            for headForm in self.sgNom:
-                # & vs && ?
-                if poss.apos.Count > 0 and (
-                    Opers.StartsVowel(headForm.value)
-                    or Opers.StartsFVowel(headForm.value)
-                ):
-                    possForm: Form
-                    for possForm in poss.apos:
-                        value: str = possForm.value + Opers.Mutate(
-                            poss.mutation, headForm.value
-                        )
-                        headForm.value = value
+    # Constructor helper: Adds a possessive pronoun to sgNom, sgDat, sgGen, plNom, plDat, plGen of itself, empties all other forms:
+    def _makePossessive(self, poss: Possessive) -> None:
+        self.isDefinite = True
+        self.isPossessed = True
+        # region singular-nominative
+        headFormSg: FormSg
+        possForm: Form
+        value: str
 
-                else:
-                    possForm: Form
-                    for possForm in poss.full:
-                        value: str = (
-                            possForm.value
-                            + " "
-                            + Opers.Mutate(poss.mutation, headForm.value)
-                        )
-                        headForm.value = value
+        for headFormSg in self.sgNom:
+            # & vs && ?
+            if len(poss.apos) > 0 and (
+                Opers.StartsVowel(headFormSg.value)
+                or Opers.StartsFVowel(headFormSg.value)
+            ):
+                for possForm in poss.apos:
+                    value = possForm.value + Opers.Mutate(
+                        poss.mutation, headFormSg.value
+                    )
+                    headFormSg.value = value
 
-            # endregion
-            # region singular-dative
-            headForm: FormSg
-            for headForm in self.sgDat:
-                if poss.apos.Count > 0 and (
-                    Opers.StartsVowel(headForm.value)
-                    or Opers.StartsFVowel(headForm.value)
-                ):
-                    possForm: Form
-                    for possForm in poss.apos:
-                        value: str = possForm.value + Opers.Mutate(
-                            poss.mutation, headForm.value
-                        )
-                        headForm.value = value
+            else:
+                for possForm in poss.full:
+                    value = (
+                        possForm.value
+                        + " "
+                        + Opers.Mutate(poss.mutation, headFormSg.value)
+                    )
+                    headFormSg.value = value
 
-                else:
-                    possForm: Form
-                    for possForm in poss.full:
-                        value: str = (
-                            possForm.value
-                            + " "
-                            + Opers.Mutate(poss.mutation, headForm.value)
-                        )
-                        headForm.value = value
+        # endregion
+        # region singular-dative
+        for headFormSg in self.sgDat:
+            if len(poss.apos) > 0 and (
+                Opers.StartsVowel(headFormSg.value)
+                or Opers.StartsFVowel(headFormSg.value)
+            ):
+                for possForm in poss.apos:
+                    value = possForm.value + Opers.Mutate(
+                        poss.mutation, headFormSg.value
+                    )
+                    headFormSg.value = value
 
-            # endregion
-            # region singular-genitive
-            headForm: FormSg
-            for headForm in self.sgGen:
-                if poss.apos.Count > 0 and (
-                    Opers.StartsVowel(headForm.value)
-                    or Opers.StartsFVowel(headForm.value)
-                ):
-                    possForm: Form
-                    for possForm in poss.apos:
-                        value: str = possForm.value + Opers.Mutate(
-                            poss.mutation, headForm.value
-                        )
-                        headForm.value = value
+            else:
+                for possForm in poss.full:
+                    value = (
+                        possForm.value
+                        + " "
+                        + Opers.Mutate(poss.mutation, headFormSg.value)
+                    )
+                    headFormSg.value = value
 
-                else:
-                    possForm: Form
-                    for possForm in poss.full:
-                        value: str = (
-                            possForm.value
-                            + " "
-                            + Opers.Mutate(poss.mutation, headForm.value)
-                        )
-                        headForm.value = value
+        # endregion
+        # region singular-genitive
+        for headFormSg in self.sgGen:
+            if len(poss.apos) > 0 and (
+                Opers.StartsVowel(headFormSg.value)
+                or Opers.StartsFVowel(headFormSg.value)
+            ):
+                for possForm in poss.apos:
+                    value = possForm.value + Opers.Mutate(
+                        poss.mutation, headFormSg.value
+                    )
+                    headFormSg.value = value
 
-            # endregion
-            # region plural-nominative
-            headForm: Form
-            for headForm in self.plNom:
-                if poss.apos.Count > 0 and (
-                    Opers.StartsVowel(headForm.value)
-                    or Opers.StartsFVowel(headForm.value)
-                ):
-                    possForm: Form
-                    for possForm in poss.apos:
-                        value: str = possForm.value + Opers.Mutate(
-                            poss.mutation, headForm.value
-                        )
-                        headForm.value = value
+            else:
+                for possForm in poss.full:
+                    value = (
+                        possForm.value
+                        + " "
+                        + Opers.Mutate(poss.mutation, headFormSg.value)
+                    )
+                    headFormSg.value = value
 
-                else:
-                    possForm: Form
-                    for possForm in poss.full:
-                        value: str = (
-                            possForm.value
-                            + " "
-                            + Opers.Mutate(poss.mutation, headForm.value)
-                        )
-                        headForm.value = value
+        # endregion
+        # region plural-nominative
+        headForm: Form
+        for headForm in self.plNom:
+            if len(poss.apos) > 0 and (
+                Opers.StartsVowel(headForm.value) or Opers.StartsFVowel(headForm.value)
+            ):
+                for possForm in poss.apos:
+                    value = possForm.value + Opers.Mutate(poss.mutation, headForm.value)
+                    headForm.value = value
 
-            # endregion
-            # region plural-dative
-            headForm: Form
-            for headForm in self.plDat:
-                if poss.apos.Count > 0 and (
-                    Opers.StartsVowel(headForm.value)
-                    or Opers.StartsFVowel(headForm.value)
-                ):
-                    possForm: Form
-                    for possForm in poss.apos:
-                        value: str = possForm.value + Opers.Mutate(
-                            poss.mutation, headForm.value
-                        )
-                        headForm.value = value
+            else:
+                for possForm in poss.full:
+                    value = (
+                        possForm.value
+                        + " "
+                        + Opers.Mutate(poss.mutation, headForm.value)
+                    )
+                    headForm.value = value
 
-                else:
-                    possForm: Form
-                    for possForm in poss.full:
-                        value: str = (
-                            possForm.value
-                            + " "
-                            + Opers.Mutate(poss.mutation, headForm.value)
-                        )
-                        headForm.value = value
+        # endregion
+        # region plural-dative
+        for headForm in self.plDat:
+            if len(poss.apos) > 0 and (
+                Opers.StartsVowel(headForm.value) or Opers.StartsFVowel(headForm.value)
+            ):
+                for possForm in poss.apos:
+                    value = possForm.value + Opers.Mutate(poss.mutation, headForm.value)
+                    headForm.value = value
 
-            # endregion
-            # region plural-genitive
-            headForm: Form
-            for headForm in self.plGen:
-                if poss.apos.Count > 0 & (
-                    Opers.StartsVowel(headForm.value)
-                    or Opers.StartsFVowel(headForm.value)
-                ):
-                    possForm: Form
-                    for possForm in poss.apos:
-                        value: str = possForm.value + Opers.Mutate(
-                            poss.mutation, headForm.value
-                        )
-                        headForm.value = value
+            else:
+                for possForm in poss.full:
+                    value = (
+                        possForm.value
+                        + " "
+                        + Opers.Mutate(poss.mutation, headForm.value)
+                    )
+                    headForm.value = value
 
-                else:
-                    possForm: Form
-                    for possForm in poss.full:
-                        value: str = (
-                            possForm.value
-                            + " "
-                            + Opers.Mutate(poss.mutation, headForm.value)
-                        )
-                        headForm.value = value
+        # endregion
+        # region plural-genitive
+        headFormPlGen: Form
+        for headFormPlGen in self.plGen:
+            if len(poss.apos) > 0 and (
+                Opers.StartsVowel(headFormPlGen.value)
+                or Opers.StartsFVowel(headFormPlGen.value)
+            ):
+                for possForm in poss.apos:
+                    value = possForm.value + Opers.Mutate(
+                        poss.mutation, headFormPlGen.value
+                    )
+                    headFormPlGen.value = value
 
-            # endregion
-            # region empty-all-others
-            self.sgDatArtN = []
-            self.sgDatArtS = []
-            self.sgGenArt = []
-            self.sgNomArt = []
-            self.plDatArt = []
-            self.plGenArt = []
-            self.plNomArt = []
-            # endregion
+            else:
+                for possForm in poss.full:
+                    value = (
+                        possForm.value
+                        + " "
+                        + Opers.Mutate(poss.mutation, headFormPlGen.value)
+                    )
+                    headFormPlGen.value = value
+
+        # endregion
+        # region empty-all-others
+        self.sgDatArtN = []
+        self.sgDatArtS = []
+        self.sgGenArt = []
+        self.sgNomArt = []
+        self.plDatArt = []
+        self.plGenArt = []
+        self.plNomArt = []
+        # endregion
 
     # Prints the noun phrase in BuNaMo format:
-    def printXml() -> ET.ElementTree:
-        root: ET.Element = ET.Element("nounPhrase")
-        doc: ET.ElementTree = ET.ElementTree(root)
+    def printXml(self) -> ET._ElementTree:
+        root: ET._Element = ET.Element("nounPhrase")
+        doc: ET._ElementTree = ET.ElementTree(root)
         root.set("default", self.getLemma())
         root.set("disambig", self.disambig)
         root.set("isImmutable", ("1" if self.isImmutable else "0"))
         root.set("isDefinite", ("1" if self.isDefinite else "0"))
         root.set("isPossessed", ("1" if self.isPossessed else "0"))
         root.set("forceNominative", ("1" if self.forceNominative else "0"))
-        f: FormSg
-        for f in self.sgNom:
-            el = ET.SubElement(root, "sgNom")
-            el.set("default", f.value)
-            el.set("gender", ("masc" if f.gender == Gender.Masc else "fem"))
-
-        f: FormSg
-        for f in self.sgGen:
-            el = ET.SubElement(root, "sgGen")
-            el.set("default", f.value)
-            el.set("gender", ("masc" if f.gender == Gender.Masc else "fem"))
-
-        f: FormSg
-        for f in self.sgNomArt:
-            el = ET.SubElement(root, "sgNomArt")
-            el.set("default", f.value)
-            el.set("gender", ("masc" if f.gender == Gender.Masc else "fem"))
-
-        f: FormSg
-        for f in self.sgGenArt:
-            el = ET.SubElement(root, "sgGenArt")
-            el.set("default", f.value)
-            el.set("gender", ("masc" if f.gender == Gender.Masc else "fem"))
-
+        fSg: FormSg
         f: Form
+        fPlGen: FormPlGen
+        for fSg in self.sgNom:
+            el = ET.SubElement(root, "sgNom")
+            el.set("default", fSg.value)
+            el.set("gender", ("masc" if fSg.gender == Gender.Masc else "fem"))
+
+        for fSg in self.sgGen:
+            el = ET.SubElement(root, "sgGen")
+            el.set("default", fSg.value)
+            el.set("gender", ("masc" if fSg.gender == Gender.Masc else "fem"))
+
+        for fSg in self.sgNomArt:
+            el = ET.SubElement(root, "sgNomArt")
+            el.set("default", fSg.value)
+            el.set("gender", ("masc" if fSg.gender == Gender.Masc else "fem"))
+
+        for fSg in self.sgGenArt:
+            el = ET.SubElement(root, "sgGenArt")
+            el.set("default", fSg.value)
+            el.set("gender", ("masc" if fSg.gender == Gender.Masc else "fem"))
+
         for f in self.plNom:
             el = ET.SubElement(root, "plNom")
             el.set("default", f.value)
 
-        f: Form
         for f in self.plGen:
             el = ET.SubElement(root, "plGen")
-            el.set("default", f.value)
+            el.set("default", fPlGen.value)
 
-        f: Form
         for f in self.plNomArt:
             el = ET.SubElement(root, "plNomArt")
             el.set("default", f.value)
 
-        f: Form
         for f in self.plGenArt:
             el = ET.SubElement(root, "plGenArt")
             el.set("default", f.value)
 
-        f: FormSg
-        for f in self.sgDat:
+        for fSg in self.sgDat:
             el = ET.SubElement(root, "sgDat")
-            el.set("default", f.value)
-            el.set("gender", ("masc" if f.gender == Gender.Masc else "fem"))
+            el.set("default", fSg.value)
+            el.set("gender", ("masc" if fSg.gender == Gender.Masc else "fem"))
 
-        f: FormSg
-        for f in self.sgDatArtN:
+        for fSg in self.sgDatArtN:
             el = ET.SubElement(root, "sgDatArtN")
-            el.set("default", f.value)
-            el.set("gender", ("masc" if f.gender == Gender.Masc else "fem"))
+            el.set("default", fSg.value)
+            el.set("gender", ("masc" if fSg.gender == Gender.Masc else "fem"))
 
-        f: FormSg
-        for f in self.sgDatArtS:
+        for fSg in self.sgDatArtS:
             el = ET.SubElement(root, "sgDatArtS")
-            el.set("default", f.value)
-            el.set("gender", ("masc" if f.gender == Gender.Masc else "fem"))
+            el.set("default", fSg.value)
+            el.set("gender", ("masc" if fSg.gender == Gender.Masc else "fem"))
 
-        f: Form
         for f in self.plDat:
             el = ET.SubElement(root, "plDat")
             el.set("default", f.value)
 
-        f: Form
         for f in self.plDatArt:
             el = ET.SubElement(root, "plDatArt")
             el.set("default", f.value)
@@ -1013,118 +1010,105 @@ class NP:
         return doc
 
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET.ElementTree]):
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> NP:
         if isinstance(doc, str):
             xml = ET.parse(doc)
             return cls.create_from_xml(xml)
 
         root = doc.getroot()
-        disambig = root.get("disambig")
-        isDefinite = True if doc.DocumentElement.get("isDefinite") == "1" else False
-        isPossessed = True if doc.DocumentElement.get("isPossessed") == "1" else False
-        isImmutable = True if doc.DocumentElement.get("isImmutable") == "1" else False
-        forceNominative = (
-            True if doc.DocumentElement.get("forceNominative") == "1" else False
-        )
-        sgNom = []
-        sgNomArt = []
-        sgGen = []
-        sgGenArt = []
-        sgDat = []
-        sgDatArtN = []
-        sgDatArtS = []
-        plNom = []
-        plNomArt = []
-        plGen = []
-        plGenArt = []
-        plDat = []
-        plDatArt = []
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sgNom"):
+        disambig = root.get("disambig", "")
+        isDefinite: bool = root.get("isDefinite") == "1"
+        isPossessed: bool = root.get("isPossessed") == "1"
+        isImmutable: bool = root.get("isImmutable") == "1"
+        forceNominative: bool = root.get("forceNominative") == "1"
+        sgNom: list[FormSg] = []
+        sgNomArt: list[FormSg] = []
+        sgGen: list[FormSg] = []
+        sgGenArt: list[FormSg] = []
+        sgDat: list[FormSg] = []
+        sgDatArtN: list[FormSg] = []
+        sgDatArtS: list[FormSg] = []
+        plNom: list[Form] = []
+        plNomArt: list[Form] = []
+        plGen: list[Form] = []
+        plGenArt: list[Form] = []
+        plDat: list[Form] = []
+        plDatArt: list[Form] = []
+        el: ET._Element
+
+        for el in root.findall("./sgNom"):
             sgNom.append(
                 FormSg(
-                    el.get("default"),
+                    el.get("default", ""),
                     (Gender.Fem if el.get("gender") == "fem" else Gender.Masc),
                 )
             )
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sgGen"):
+        for el in root.findall("./sgGen"):
             sgGen.append(
                 FormSg(
-                    el.get("default"),
+                    el.get("default", ""),
                     (Gender.Fem if el.get("gender") == "fem" else Gender.Masc),
                 )
             )
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sgNomArt"):
+        for el in root.findall("./sgNomArt"):
             sgNomArt.append(
                 FormSg(
-                    el.get("default"),
+                    el.get("default", ""),
                     (Gender.Fem if el.get("gender") == "fem" else Gender.Masc),
                 )
             )
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sgGenArt"):
+        for el in root.findall("./sgGenArt"):
             sgGenArt.append(
                 FormSg(
-                    el.get("default"),
+                    el.get("default", ""),
                     (Gender.Fem if el.get("gender") == "fem" else Gender.Masc),
                 )
             )
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/plNom"):
-            plNom.append(Form(el.get("default")))
+        for el in root.findall("./plNom"):
+            plNom.append(Form(el.get("default", "")))
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/plGen"):
-            plGen.append(Form(el.get("default")))
+        for el in root.findall("./plGen"):
+            plGen.append(Form(el.get("default", "")))
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/plNomArt"):
-            plNomArt.append(Form(el.get("default")))
+        for el in root.findall("./plNomArt"):
+            plNomArt.append(Form(el.get("default", "")))
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/plGenArt"):
-            plGenArt.append(Form(el.get("default")))
+        for el in root.findall("./plGenArt"):
+            plGenArt.append(Form(el.get("default", "")))
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sgDat"):
+        for el in root.findall("./sgDat"):
             sgDat.append(
                 FormSg(
-                    el.get("default"),
+                    el.get("default", ""),
                     (Gender.Fem if el.get("gender") == "fem" else Gender.Masc),
                 )
             )
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sgDatArtN"):
+        for el in root.findall("./sgDatArtN"):
             sgDatArtN.append(
                 FormSg(
-                    el.get("default"),
+                    el.get("default", ""),
                     (Gender.Fem if el.get("gender") == "fem" else Gender.Masc),
                 )
             )
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sgDatArtS"):
+        for el in root.findall("./sgDatArtS"):
             sgDatArtS.append(
                 FormSg(
-                    el.get("default"),
+                    el.get("default", ""),
                     (Gender.Fem if el.get("gender") == "fem" else Gender.Masc),
                 )
             )
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/plDat"):
-            plDat.append(Form(el.get("default")))
+        for el in root.findall("./plDat"):
+            plDat.append(Form(el.get("default", "")))
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/plDatArt"):
-            plDatArt.append(Form(el.get("default")))
+        for el in root.findall("./plDatArt"):
+            plDatArt.append(Form(el.get("default", "")))
 
         return cls(
             sgNom=sgNom,

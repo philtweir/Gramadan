@@ -1,17 +1,19 @@
-﻿import xml.etree.ElementTree as ET
+﻿from __future__ import annotations
+
+from lxml import etree as ET
 from typing import Optional, Union
 
-from features import Form
+from .features import Form
 
 # A class for a preposition:
 class Preposition:
     disambig: str = ""
 
     def getNickname(self) -> str:
-        ret: str = this.lemma + " prep"
-        if this.disambig != "":
-            ret += " " + this.disambig
-        ret = ret.Replace(" ", "_")
+        ret: str = self.lemma + " prep"
+        if self.disambig != "":
+            ret += " " + self.disambig
+        ret = ret.replace(" ", "_")
         return ret
 
     def getLemma(self) -> str:
@@ -65,15 +67,15 @@ class Preposition:
             self.pl3 = pl3
 
     # Returns true if the preposition has no infected forms:
-    def isEmpty() -> bool:
+    def isEmpty(self) -> bool:
         return (
-            self.sg1.Count
-            + self.sg2.Count
-            + self.sg3Masc.Count
-            + self.sg3Fem.Count
-            + self.pl1.Count
-            + self.pl2.Count
-            + self.pl3.Count
+            len(self.sg1)
+            + len(self.sg2)
+            + len(self.sg3Masc)
+            + len(self.sg3Fem)
+            + len(self.pl1)
+            + len(self.pl2)
+            + len(self.pl3)
             == 0
         )
 
@@ -82,39 +84,68 @@ class Preposition:
     def from_strings(
         cls,
         lemma: str,
-        sg1: str,
-        sg2: str,
-        sg3Masc: str,
-        sg3Fem: str,
-        pl1: str,
-        pl2: str,
-        pl3: str,
-    ):
-        kwargs = {}
-        if sg1 != "":
-            kwargs["sg1"] = [Form(sg1)]
-        if sg2 != "":
-            kwargs["sg2"] = [Form(sg2)]
-        if sg3Masc != "":
-            kwargs["sg3Masc"] = [Form(sg3Masc)]
-        if sg3Fem != "":
-            kwargs["sg3Fem"] = [Form(sg3Fem)]
-        if pl1 != "":
-            kwargs["pl1"] = [Form(pl1)]
-        if pl2 != "":
-            kwargs["pl2"] = [Form(pl2)]
-        if pl3 != "":
-            kwargs["pl3"] = [Form(pl3)]
-        cls(lemma, **kwargs)
+        sg1Str: str,
+        sg2Str: str,
+        sg3MascStr: str,
+        sg3FemStr: str,
+        pl1Str: str,
+        pl2Str: str,
+        pl3Str: str,
+    ) -> Preposition:
+        if sg1Str != "":
+            sg1 = [Form(sg1Str)]
+        else:
+            sg1 = []
+
+        if sg2Str != "":
+            sg2 = [Form(sg2Str)]
+        else:
+            sg2 = []
+
+        if sg3MascStr != "":
+            sg3Masc = [Form(sg3MascStr)]
+        else:
+            sg3Masc = []
+
+        if sg3FemStr != "":
+            sg3Fem = [Form(sg3FemStr)]
+        else:
+            sg3Fem = []
+
+        if pl1Str != "":
+            pl1 = [Form(pl1Str)]
+        else:
+            pl1 = []
+
+        if pl2Str != "":
+            pl2 = [Form(pl2Str)]
+        else:
+            pl2 = []
+
+        if pl3Str != "":
+            pl3 = [Form(pl3Str)]
+        else:
+            pl3 = []
+
+        return cls(
+            lemma,
+            sg1=sg1,
+            sg2=sg2,
+            sg3Masc=sg3Masc,
+            sg3Fem=sg3Fem,
+            pl1=pl1,
+            pl2=pl2,
+            pl3=pl3,
+        )
 
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET.ElementTree]):
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> Preposition:
         if isinstance(doc, str):
             xml = ET.parse(doc)
             return cls.create_from_xml(xml)
         root = doc.getroot()
-        lemma = root.get("default")
-        disambig = root.get("disambig")
+        lemma = root.get("default", "")
+        disambig = root.get("disambig", "")
 
         sg1: list[Form] = []
         sg2: list[Form] = []
@@ -124,69 +155,64 @@ class Preposition:
         pl2: list[Form] = []
         pl3: list[Form] = []
 
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sg1"):
-            sg1.append(Form(el.get("default")))
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sg2"):
-            sg2.append(Form(el.get("default")))
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sg3Masc"):
-            sg3Masc.append(Form(el.get("default")))
-        el: ET.Element
-        for el in doc.SelectNodes("/*/sg3Fem"):
-            sg3Fem.append(Form(el.get("default")))
-        el: ET.Element
-        for el in doc.SelectNodes("/*/pl1"):
-            pl1.append(Form(el.get("default")))
-        el: ET.Element
-        for el in doc.SelectNodes("/*/pl2"):
-            pl2.append(Form(el.get("default")))
-        el: ET.Element
-        for el in doc.SelectNodes("/*/pl3"):
-            pl3.append(Form(el.get("default")))
+        el: ET._Element
+        for el in root.findall("./sg1"):
+            sg1.append(Form(el.get("default", "")))
+
+        for el in root.findall("./sg2"):
+            sg2.append(Form(el.get("default", "")))
+
+        for el in root.findall("./sg3Masc"):
+            sg3Masc.append(Form(el.get("default", "")))
+
+        for el in root.findall("./sg3Fem"):
+            sg3Fem.append(Form(el.get("default", "")))
+
+        for el in root.findall("./pl1"):
+            pl1.append(Form(el.get("default", "")))
+
+        for el in root.findall("./pl2"):
+            pl2.append(Form(el.get("default", "")))
+
+        for el in root.findall("./pl3"):
+            pl3.append(Form(el.get("default", "")))
 
         return cls(lemma, sg1, sg2, sg3Masc, sg3Fem, pl1, pl2, pl3, disambig)
 
     # Prints the preposition in BuNaMo format:
-    def printXml(self) -> ET.ElementTree:
-        root: ET.Element = ET.Element("preposition")
-        doc: ET.ElementTree = ET.ElementTree(root)
+    def printXml(self) -> ET._ElementTree:
+        root: ET._Element = ET.Element("preposition")
+        doc: ET._ElementTree = ET.ElementTree(root)
+        f: Form
 
         root.set("default", self.lemma)
         root.set("disambig", self.disambig)
-        f: Form
-        for f in sg1:
+
+        for f in self.sg1:
             el = ET.SubElement(root, "sg1")
             el.set("default", f.value)
 
-        f: Form
-        for f in sg2:
+        for f in self.sg2:
             el = ET.SubElement(root, "sg2")
             el.set("default", f.value)
 
-        f: Form
-        for f in sg3Masc:
+        for f in self.sg3Masc:
             el = ET.SubElement(root, "sg3Masc")
             el.set("default", f.value)
 
-        f: Form
-        for f in sg3Fem:
+        for f in self.sg3Fem:
             el = ET.SubElement(root, "sg3Fem")
             el.set("default", f.value)
 
-        f: Form
-        for f in pl1:
+        for f in self.pl1:
             el = ET.SubElement(root, "pl1")
             el.set("default", f.value)
 
-        f: Form
-        for f in pl2:
+        for f in self.pl2:
             el = ET.SubElement(root, "pl2")
             el.set("default", f.value)
 
-        f: Form
-        for f in pl3:
+        for f in self.pl3:
             el = ET.SubElement(root, "pl3")
             el.set("default", f.value)
 

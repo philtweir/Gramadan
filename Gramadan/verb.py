@@ -1,12 +1,14 @@
-﻿from dataclasses import dataclass
-from typing import Optional, Union
-from enum import Enum, auto
-import xml.etree.ElementTree as ET
-from vp import VPTense, VPPerson, VPShape, VPPolarity
-from features import Mutation, Form
+﻿from __future__ import annotations
 
-# Enumerations used to access verb forms:
-class VerbTense(Enum):
+from dataclasses import dataclass
+from typing import Optional, Union, Sequence
+from enum import Enum, auto
+from lxml import etree as ET
+from .features import Mutation, Form, AutoName
+
+# Enumerations used to access verb phrase forms:
+class VPTense(AutoName):
+    Any = auto()
     Past = auto()
     PastCont = auto()
     Pres = auto()
@@ -15,17 +17,58 @@ class VerbTense(Enum):
     Cond = auto()
 
 
-class VerbMood(Enum):
+class VPMood(AutoName):
     Imper = auto()
     Subj = auto()
 
 
-class VerbDependency(Enum):
+class VPShape(AutoName):
+    Any = auto()
+    Declar = auto()
+    Interrog = auto()
+    # /*, RelDep, RelIndep, Report*/ }
+
+
+class VPPerson(AutoName):
+    Any = auto()
+    Sg1 = auto()
+    Sg2 = auto()
+    Sg3Masc = auto()
+    Sg3Fem = auto()
+    Pl1 = auto()
+    Pl2 = auto()
+    Pl3 = auto()
+    NoSubject = auto()
+    Auto = auto()
+
+
+class VPPolarity(AutoName):
+    Any = auto()
+    Pos = auto()
+    Neg = auto()
+
+
+# Enumerations used to access verb forms:
+class VerbTense(AutoName):
+    Past = auto()
+    PastCont = auto()
+    Pres = auto()
+    PresCont = auto()
+    Fut = auto()
+    Cond = auto()
+
+
+class VerbMood(AutoName):
+    Imper = auto()
+    Subj = auto()
+
+
+class VerbDependency(AutoName):
     Indep = auto()
     Dep = auto()
 
 
-class VerbPerson(Enum):
+class VerbPerson(AutoName):
     Base = auto()
     Sg1 = auto()
     Sg2 = auto()
@@ -35,6 +78,11 @@ class VerbPerson(Enum):
     Pl3 = auto()
     Auto = auto()
 
+
+M = Mutation
+VT = VerbTense
+VD = VerbDependency
+VPN = VerbPerson
 
 # A rule for building a tensed form of a verbal phrase from a verb:
 @dataclass
@@ -50,6 +98,8 @@ class VerbTenseRule:
     verbDependency: VerbDependency
     verbPerson: VerbPerson
 
+    pronoun: str = ""
+
 
 TenseDictionary = dict[VerbTense, dict[VerbDependency, dict[VerbPerson, list[Form]]]]
 MoodDictionary = dict[VerbMood, dict[VerbPerson, list[Form]]]
@@ -61,11 +111,11 @@ TenseRuleDictionary = dict[
 class Verb:
     disambig: str = ""
 
-    def getNickname() -> str:
-        ret: str = getLemma() + " verb"
+    def getNickname(self) -> str:
+        ret: str = self.getLemma() + " verb"
         if self.disambig != "":
             ret += " " + self.disambig
-        ret = ret.Replace(" ", "_")
+        ret = ret.replace(" ", "_")
         return ret
 
     # Forms of the verb:
@@ -73,10 +123,10 @@ class Verb:
         self,
         verbalNoun: Optional[list[Form]],
         verbalAdjective: Optional[list[Form]],
-        tenses: Optional[TenseDictionary],
-        moods: Optional[MoodDictionary],
-        tenseRules: Optional[TenseRuleDictionary],
-        disambig: str = ""
+        tenses: Optional[TenseDictionary] = None,
+        moods: Optional[MoodDictionary] = None,
+        tenseRules: Optional[TenseRuleDictionary] = None,
+        disambig: str = "",
     ):
         self.verbalNoun: list[Form] = [] if verbalNoun is None else verbalNoun
         self.verbalAdjective: list[Form] = (
@@ -90,7 +140,7 @@ class Verb:
             self._populate_tense_rules()
 
         # region prepare-structure-for-data
-        ts: tuple[VerbTense] = (
+        ts: Sequence[VerbTense] = (
             VerbTense.Past,
             VerbTense.PastCont,
             VerbTense.Pres,
@@ -98,9 +148,9 @@ class Verb:
             VerbTense.Fut,
             VerbTense.Cond,
         )
-        ms: tuple[VerbMood] = (VerbMood.Imper, VerbMood.Subj)
-        ds: tuple[VerbDependency] = (VerbDependency.Indep, VerbDependency.Dep)
-        ps: tuple[VerbPerson] = (
+        ms: Sequence[VerbMood] = (VerbMood.Imper, VerbMood.Subj)
+        ds: Sequence[VerbDependency] = (VerbDependency.Indep, VerbDependency.Dep)
+        ps: Sequence[VerbPerson] = (
             VerbPerson.Base,
             VerbPerson.Sg1,
             VerbPerson.Sg2,
@@ -110,38 +160,39 @@ class Verb:
             VerbPerson.Pl3,
             VerbPerson.Auto,
         )
-        if tenses is not None:
-            self.tenses = tenses
-        else:
-            t: VerbTense
+
+        t: VerbTense
+        d: VerbDependency
+        p: VerbPerson
+        m: VerbMood
+
+        if tenses is None:
+            tenses = {}
             for t in ts:
                 tenses[t] = {}
-                d: VerbDependency
                 for d in ds:
                     tenses[t][d] = {}
-                    p: VerbPerson
                     for p in ps:
                         tenses[t][d][p] = []
+        self.tenses = tenses
 
-        if tenses is not None:
-            self.tenses = tenses
-        else:
-            m: VerbMood
+        if moods is None:
+            moods = {}
             for m in ms:
                 moods[m] = {}
-                p: VerbPerson
                 for p in ps:
                     moods[m][p] = []
+        self.moods = moods
         # endregion
 
         self.disambig = disambig
 
     # Returns tense rules that match the parameters. In each paramer, '.Any' means 'any'.
     def getTenseRules(
-        tense: VPTense, person: VPPerson, shape: VPShape, polarity: VPPolarity
+        self, tense: VPTense, person: VPPerson, shape: VPShape, polarity: VPPolarity
     ) -> list[VerbTenseRule]:
         ret: list[VerbTenseRule] = []
-        ts: tuple[VPTense] = (
+        ts: Sequence[VPTense] = (
             VPTense.Past,
             VPTense.PastCont,
             VPTense.Pres,
@@ -149,11 +200,11 @@ class Verb:
             VPTense.Fut,
             VPTense.Cond,
         )
-        ss: tuple[VPShape] = (
+        ss: Sequence[VPShape] = (
             VPShape.Declar,
             VPShape.Interrog,
         )  # /*, VPShape.RelDep, VPShape.RelIndep, VPShape.Report*/)
-        pers: tuple[VPPerson] = (
+        pers: Sequence[VPPerson] = (
             VPPerson.Sg1,
             VPPerson.Sg2,
             VPPerson.Sg3Masc,
@@ -164,7 +215,7 @@ class Verb:
             VPPerson.NoSubject,
             VPPerson.Auto,
         )
-        pols: tuple[VPPolarity] = (VPPolarity.Pos, VPPolarity.Neg)
+        pols: Sequence[VPPolarity] = (VPPolarity.Pos, VPPolarity.Neg)
 
         t: VPTense
         for t in ts:
@@ -186,11 +237,11 @@ class Verb:
         return ret
 
     # Constructor:
-    def _populate_tense_rules(self):
-        tenseRules: TenseRulesDictionary = {}
+    def _populate_tense_rules(self) -> None:
+        tenseRules: TenseRuleDictionary = {}
 
         # region prepare-structure-for-rules
-        ts: tuple[VPTense] = (
+        ts: Sequence[VPTense] = (
             VPTense.Past,
             VPTense.PastCont,
             VPTense.Pres,
@@ -198,11 +249,11 @@ class Verb:
             VPTense.Fut,
             VPTense.Cond,
         )
-        ss: tuple[VPShape] = (
+        ss: Sequence[VPShape] = (
             VPShape.Declar,
             VPShape.Interrog,
         )  # /*, VPShape.RelDep, VPShape.RelIndep, VPShape.Report*/ )
-        pers: tuple[VPPerson] = (
+        pers: Sequence[VPPerson] = (
             VPPerson.Sg1,
             VPPerson.Sg2,
             VPPerson.Sg3Masc,
@@ -213,24 +264,23 @@ class Verb:
             VPPerson.NoSubject,
             VPPerson.Auto,
         )
-        pols: tuple[VPPolarity] = (VPPolarity.Pos, VPPolarity.Neg)
+        pols: Sequence[VPPolarity] = (VPPolarity.Pos, VPPolarity.Neg)
         t: VPTense
+        p: VPPerson
+        per: VPPerson
+        s: VPShape
+        pol: VPPolarity
         for t in ts:
             tenseRules[t] = {}
-            per: VPPerson
             for per in pers:
                 tenseRules[t][per] = {}
-                s: VPShape
                 for s in ss:
                     tenseRules[t][per][s] = {}
-                    pol: VPPolarity
                     for pol in pols:
                         tenseRules[t][per][s][pol] = []
 
         # endregion
         # region default-rules
-        t: VPTense
-        p: VPPerson
         pron: str
         dec: VPShape = VPShape.Declar
         rog: VPShape = VPShape.Interrog
@@ -1253,60 +1303,66 @@ class Verb:
         # endregion
 
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET.ElementTree]):
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> Verb:
         if isinstance(doc, str):
             xml = ET.parse(doc)
             return cls.create_from_xml(xml)
 
-        disambig = root.get("disambig")
+        root = doc.getroot()
+        disambig = root.get("disambig", "")
         verbalNoun: list[Form] = []
         verbalAdjective: list[Form] = []
-        tenses: TenseDictionary = {}
-        moods: MoodDictionary = {}
-
-        # Helper methods to add forms quickly:
-        def _addTenseDep(t: VerbTense, d: VerbDependency, p: VerbPerson, form: str):
-            tenses[t][d][p].append(Form(form))
-
-        def _addTense(t: VerbTense, p: VerbPerson, form: str):
-            _addTenseDep(t, VerbDependency.Indep, p, form)
-            _addTenseDep(t, VerbDependency.Dep, p, form)
-
-        def _addMood(m: VerbMood, p: VerbPerson, form: str):
-            moods[m][p].append(Form(form))
-
-        el: XmlElement
-        for el in doc.SelectNodes("/*/verbalNoun"):
-            verbalNoun.append(Form(el.get("default")))
-
-        el: XmlElement
-        for el in doc.SelectNodes("/*/verbalAdjective"):
-            verbalAdjective.append(Form(el.get("default")))
-
-        el: XmlElement
-        for el in doc.SelectNodes("/*/tenseForm"):
-            value: str = el.get("default")
-            tense: VerbTense = VerbTense.Parse(typeof(VerbTense), el.get("tense"))
-            dependency: VerbDependency = VerbDependency.Parse(
-                typeof(VerbDependency), el.get("dependency")
-            )
-            person: VerbPerson = VerbPerson.Parse(typeof(VerbPerson), el.get("person"))
-            _addTense(tense, dependency, person, value)
-
-        el: XmlElement
-        for el in doc.SelectNodes("/*/moodForm"):
-            value: str = el.get("default")
-            mood: VerbMood = VerbMood.Parse(typeof(VerbMood), el.get("mood"))
-            person: VerbPerson = VerbPerson.Parse(typeof(VerbPerson), el.get("person"))
-            _addMood(mood, person, value)
 
         verb = cls(
             verbalNoun=verbalNoun,
             verbalAdjective=verbalAdjective,
-            tenses=tenses,
-            moods=moods,
-            disambig=disambig
+            disambig=disambig,
         )
+        tenses: TenseDictionary = verb.tenses
+        moods: MoodDictionary = verb.moods
+
+        # Helper methods to add forms quickly:
+        def _addTenseDep(
+            t: VerbTense, d: VerbDependency, p: VerbPerson, form: str
+        ) -> None:
+            tenses[t][d][p].append(Form(form))
+
+        def _addTense(
+            t: VerbTense, d: Optional[VerbDependency], p: VerbPerson, form: str
+        ) -> None:
+            if d:
+                tenses[t][d][p].append(Form(form))
+            else:
+                tenses[t][VerbDependency.Indep][p].append(Form(form))
+                tenses[t][VerbDependency.Dep][p].append(Form(form))
+
+        def _addMood(m: VerbMood, p: VerbPerson, form: str) -> None:
+            moods[m][p].append(Form(form))
+
+        el: ET._Element
+        value: str
+        dependency: VerbDependency
+        person: VerbPerson
+        tense: VerbTense
+
+        for el in root.findall("./verbalNoun"):
+            verbalNoun.append(Form(el.get("default", "")))
+
+        for el in root.findall("./verbalAdjective"):
+            verbalAdjective.append(Form(el.get("default", "")))
+
+        for el in root.findall("./tenseForm"):
+            value = el.get("default", "")
+            tense = VerbTense(el.get("tense"))
+            dependency = VerbDependency(el.get("dependency"))
+            person = VerbPerson(el.get("person"))
+            _addTense(tense, dependency, person, value)
+
+        for el in root.findall("./moodForm"):
+            value = el.get("default", "")
+            mood = VerbMood(el.get("mood"))
+            person = VerbPerson(el.get("person"))
+            _addMood(mood, person, value)
 
         # PTW: should the rest only happen with XML load?
 
@@ -1507,16 +1563,18 @@ class Verb:
                 rule.mutation = Mutation.Len1
         # endregion
 
+        return verb
+
     # Extracts the verb's lemma:
-    def getLemma() -> str:
+    def getLemma(self) -> str:
         ret: str = ""
         # the imperative second-person singular is the lemma:
-        if self.moods[VerbMood.Imper][VerbPerson.Sg2].Count > 0:
+        if len(self.moods[VerbMood.Imper][VerbPerson.Sg2]) > 0:
             ret = self.moods[VerbMood.Imper][VerbPerson.Sg2][0].value
         if ret == "":
             # if not available, then the past tense base is the lemma:
             if (
-                self.tenses[VerbTense.Past][VerbDependency.Indep][VerbPerson.Base].Count
+                len(self.tenses[VerbTense.Past][VerbDependency.Indep][VerbPerson.Base])
                 > 0
             ):
                 ret = self.tenses[VerbTense.Past][VerbDependency.Indep][
@@ -1526,46 +1584,43 @@ class Verb:
         return ret
 
     # Prints the verb in BuNaMo format:
-    def printXml(self) -> ET.ElementTree:
-        root: ET.Element = ET.Element("verb")
-        doc: ET.ElementTree = ET.ElementTree(root)
+    def printXml(self) -> ET._ElementTree:
+        root: ET._Element = ET.Element("verb")
+        doc: ET._ElementTree = ET.ElementTree(root)
 
         root.set("default", self.getLemma())
         root.set("disambig", self.disambig)
 
         f: Form
-        for f in this.verbalNoun:
+        for f in self.verbalNoun:
             el = ET.SubElement(root, "verbalNoun")
             el.set("default", f.value)
 
-        f: Form
-        for f in this.verbalAdjective:
+        for f in self.verbalAdjective:
             el = ET.SubElement(root, "verbalAdjective")
             el.set("default", f.value)
 
         tense: VerbTense
-        for tense in this.tenses:
-            dependency: VerbDependency
+        dependency: VerbDependency
+        person: VerbPerson
+
+        for tense in self.tenses:
             for dependency in self.tenses[tense]:
-                person: VerbPerson
                 for person in self.tenses[tense][dependency]:
-                    f: Form
-                    for f in this.tenses[tense][dependency][person]:
+                    for f in self.tenses[tense][dependency][person]:
                         el = ET.SubElement(root, "tenseForm")
                         el.set("default", f.value)
-                        el.set("tense", tense.ToString())
-                        el.set("dependency", dependency.ToString())
-                        el.set("person", person.ToString())
+                        el.set("tense", tense.value)
+                        el.set("dependency", dependency.value)
+                        el.set("person", person.value)
 
         mood: VerbMood
-        for mood in this.moods:
-            person: VerbPerson
+        for mood in self.moods:
             for person in self.moods[mood]:
-                f: Form
                 for f in self.moods[mood][person]:
                     el = ET.SubElement(root, "moodForm")
                     el.set("default", f.value)
-                    el.set("mood", mood.ToString())
-                    el.set("person", person.ToString())
+                    el.set("mood", mood.value)
+                    el.set("person", person.value)
 
         return doc

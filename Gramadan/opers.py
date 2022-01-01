@@ -1,4 +1,6 @@
-﻿from features import Mutation
+﻿import re
+from typing import Optional, Sequence
+from .features import Mutation
 
 
 class Opers:
@@ -6,44 +8,44 @@ class Opers:
     def Demutate(text: str) -> str:
         pattern: str
         pattern = "^[bB][hH]([fF].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         pattern = "^([bcdfgmpstBCDFGMPST])[hH](.*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1$2")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1\2", text)
         pattern = "^[mM]([bB].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         pattern = "^[gG]([cC].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         pattern = "^[nN]([dD].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         pattern = "^[nN]([gG].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         pattern = "^[bB]([pP].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         pattern = "^[tT]([sS].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         pattern = "^[dD]([tT].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         pattern = "^[dD]'([fF])[hH](.*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1$2")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1\2", text)
         pattern = "^[dD]'([aeiouaáéíóúAEIOUÁÉÍÓÚ].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         pattern = "^[hH]([aeiouaáéíóúAEIOUÁÉÍÓÚ].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         pattern = "^[nN]-([aeiouaáéíóúAEIOUÁÉÍÓÚ].*)$"
-        if Regex.IsMatch(text, pattern):
-            text = Regex.Replace(text, pattern, "$1")
+        if re.search(pattern, text):
+            text = re.sub(pattern, r"\1", text)
         return text
 
     # Performs a mutation on the string:
@@ -56,193 +58,193 @@ class Opers:
             # lenition 1
             if ret == "":
                 pattern = "^([pbmftdcgPBMFTDCG])[jJ]"
-                if Regex.IsMatch(text, pattern):
+                if re.search(pattern, text):
                     ret = text
                     # do not mutate exotic words with J in second position, like Djibouti
             if ret == "":
                 pattern = "^([pbmftdcgPBMFTDCG])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "$1h$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"\1h\2", text)
             if ret == "":
                 pattern = "^([sS])([rnlRNLaeiouáéíóúAEIOUÁÉÍÓÚ].*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "$1h$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"\1h\2", text)
             if ret == "":
                 ret = text
             if mutation == Mutation.Len1D:
                 pattern = "^([aeiouáéíóúAEIOUÁÉÍÓÚfF])(.*)$"
-                if Regex.IsMatch(ret, pattern):
-                    ret = Regex.Replace(ret, pattern, "d'$1$2")
+                if re.search(pattern, ret):
+                    ret = re.sub(pattern, r"d'\1\2", ret)
         elif mutation == Mutation.Len2 or mutation == Mutation.Len2D:
             # lenition 2: same as lenition 1 but leaves "d", "t" and "s" unmutated
             if ret == "":
                 pattern = "^([pbmftdcgPBMFTDCG])[jJ]"
-                if Regex.IsMatch(text, pattern):
+                if re.search(pattern, text):
                     ret = text
                     # do not mutate exotic words with J in second position, like Djibouti
             if ret == "":
                 pattern = "^([pbmfcgPBMFCG])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "$1h$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"\1h\2", text)
             if ret == "":
                 ret = text
             if mutation == Mutation.Len2D:
                 pattern = "^([aeiouáéíóúAEIOUÁÉÍÓÚfF])(.*)$"
-                if Regex.IsMatch(ret, pattern):
-                    ret = Regex.Replace(ret, pattern, "d'$1$2")
+                if re.search(pattern, ret):
+                    ret = re.sub(pattern, r"d'\1\2", ret)
         elif mutation == Mutation.Len3 or mutation == Mutation.Len3D:
             # lenition 3: same as lenition 2 but also changes "s" into "ts"
             if ret == "":
                 pattern = "^([pbmftdcgPBMFTDCG])[jJ]"
-                if Regex.IsMatch(text, pattern):
+                if re.search(pattern, text):
                     ret = text
                     # do not mutate exotic words with J in second position, like Djibouti
             if ret == "":
                 pattern = "^([pbmfcgPBMFCG])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "$1h$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"\1h\2", text)
             if ret == "":
                 pattern = "^([sS])([rnlRNLaeiouáéíóúAEIOUÁÉÍÓÚ].*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "t$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"t\1\2", text)
             if ret == "":
                 ret = text
             if mutation == Mutation.Len3D:
                 pattern = "^([aeiouáéíóúAEIOUÁÉÍÓÚfF])(.*)$"
-                if Regex.IsMatch(ret, pattern):
-                    ret = Regex.Replace(ret, pattern, "d'$1$2")
+                if re.search(pattern, ret):
+                    ret = re.sub(pattern, r"d'\1\2", ret)
         elif mutation == Mutation.Ecl1:
             # eclisis 1
             if ret == "":
                 pattern = "^([pP])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "b$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"b\1\2", text)
             if ret == "":
                 pattern = "^([bB])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "m$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"m\1\2", text)
             if ret == "":
                 pattern = "^([fF])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "bh$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"bh\1\2", text)
             if ret == "":
                 pattern = "^([cC])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "g$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"g\1\2", text)
             if ret == "":
                 pattern = "^([gG])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "n$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"n\1\2", text)
             if ret == "":
                 pattern = "^([tT])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "d$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"d\1\2", text)
             if ret == "":
                 pattern = "^([dD])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "n$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"n\1\2", text)
             if ret == "":
                 pattern = "^([aeiuoáéíúó])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "n-$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"n-\1\2", text)
             if ret == "":
                 pattern = "^([AEIUOÁÉÍÚÓ])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "n$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"n\1\2", text)
         elif mutation == Mutation.Ecl1x:
             # eclisis 1x: same as eclipsis 1 but leaves vowels unchanged
             if ret == "":
                 pattern = "^([pP])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "b$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"b\1\2", text)
             if ret == "":
                 pattern = "^([bB])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "m$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"m\1\2", text)
             if ret == "":
                 pattern = "^([fF])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "bh$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"bh\1\2", text)
             if ret == "":
                 pattern = "^([cC])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "g$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"g\1\2", text)
             if ret == "":
                 pattern = "^([gG])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "n$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"n\1\2", text)
             if ret == "":
                 pattern = "^([tT])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "d$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"d\1\2", text)
             if ret == "":
                 pattern = "^([dD])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "n$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"n\1\2", text)
         elif mutation == Mutation.Ecl2:
             # eclipsis 2: same as eclipsis 1 but leaves "t", "d" and vowels unchanged
             if ret == "":
                 pattern = "^([pP])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "b$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"b\1\2", text)
             if ret == "":
                 pattern = "^([bB])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "m$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"m\1\2", text)
             if ret == "":
                 pattern = "^([fF])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "bh$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"bh\1\2", text)
             if ret == "":
                 pattern = "^([cC])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "g$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"g\1\2", text)
             if ret == "":
                 pattern = "^([gG])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "n$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"n\1\2", text)
         elif mutation == Mutation.Ecl3:
             # eclipsis 3: same as eclipsis 2 but also changes "s" to "ts"
             if ret == "":
                 pattern = "^([pP])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "b$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"b\1\2", text)
             if ret == "":
                 pattern = "^([bB])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "m$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"m\1\2", text)
             if ret == "":
                 pattern = "^([fF])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "bh$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"bh\1\2", text)
             if ret == "":
                 pattern = "^([cC])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "g$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"g\1\2", text)
             if ret == "":
                 pattern = "^([gG])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "n$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"n\1\2", text)
             if ret == "":
                 pattern = "^([sS])([rnlRNLaeiouáéíóúAEIOUÁÉÍÓÚ].*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "t$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"t\1\2", text)
         elif mutation == Mutation.PrefT:
             # t-prefixation
             if ret == "":
                 pattern = "^([aeiuoáéíúó])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "t-$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"t-\1\2", text)
             if ret == "":
                 pattern = "^([AEIUOÁÉÍÚÓ])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "t$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"t\1\2", text)
         elif mutation == Mutation.PrefH:
             # h-prefixation
             if ret == "":
                 pattern = "^([aeiuoáéíúóAEIUOÁÉÍÚÓ])(.*)$"
-                if Regex.IsMatch(text, pattern):
-                    ret = Regex.Replace(text, pattern, "h$1$2")
+                if re.search(pattern, text):
+                    ret = re.sub(pattern, r"h\1\2", text)
 
         if ret == "":
             ret = text
@@ -251,58 +253,58 @@ class Opers:
     # Tells you whether the string ends in a "dentals" cosonant:
     @staticmethod
     def EndsDental(txt: str) -> bool:
-        return Regex.IsMatch(txt, "[dntsDNTS]$")
+        return re.search("[dntsDNTS]$", txt) is not None
 
     # Tells you whether the string ends in a slender consonant cluster:
     @staticmethod
     def IsSlender(txt: str) -> bool:
-        return Regex.IsMatch(txt, "[eiéí][^aeiouáéíóú]+$")
+        return re.search("[eiéí][^aeiouáéíóú]+$", txt) is not None
 
     # Tells you whether the string ends in a slender consonant cluster where the slenderness is caused by an "i" (and not by an "e"):
     @staticmethod
     def IsSlenderI(txt: str) -> bool:
-        return Regex.IsMatch(txt, "[ií][^aeiouáéíóú]+$")
+        return re.search("[ií][^aeiouáéíóú]+$", txt) is not None
 
     # Tells you whether the string has a vowel or 'fh' (but not 'fhl' or 'fhr') at its start:
     @staticmethod
     def StartsVowelFhx(txt: str) -> bool:
-        ret: boot = False
-        if Regex.IsMatch(txt, "^[aeiouáéíóúAEIOUÁÉÍÓÚ]"):
-            ret = true
-        if Regex.IsMatch(txt, "^fh[^lr]", re.I):
-            ret = true
+        ret: bool = False
+        if re.search("^[aeiouáéíóúAEIOUÁÉÍÓÚ]", txt):
+            ret = True
+        if re.search("^fh[^lr]", txt, re.I):
+            ret = True
         return ret
 
     # Tells you whether the string ends in a vowel:
     @staticmethod
     def EndsVowel(txt: str) -> bool:
-        ret: boot = False
-        if Regex.IsMatch(txt, "[aeiouáéíóúAEIOUÁÉÍÓÚ]$"):
-            ret = true
+        ret: bool = False
+        if re.search("[aeiouáéíóúAEIOUÁÉÍÓÚ]$", txt):
+            ret = True
         return ret
 
     # Tells you whether the string starts in a vowel:
     @staticmethod
     def StartsVowel(txt: str) -> bool:
-        ret: boot = False
-        if Regex.IsMatch(txt, "^[aeiouáéíóúAEIOUÁÉÍÓÚ]"):
-            ret = true
+        ret: bool = False
+        if re.search("^[aeiouáéíóúAEIOUÁÉÍÓÚ]", txt):
+            ret = True
         return ret
 
     # Tells you whether the string starts in F followed by a vowel:
     @staticmethod
     def StartsFVowel(txt: str) -> bool:
-        ret: boot = False
-        if Regex.IsMatch(txt, "^[fF][aeiouáéíóúAEIOUÁÉÍÓÚ]"):
-            ret = true
+        ret: bool = False
+        if re.search("^[fF][aeiouáéíóúAEIOUÁÉÍÓÚ]", txt):
+            ret = True
         return ret
 
     # Tells you whether the string starts in b, m, p:
     @staticmethod
     def StartsBilabial(txt: str) -> bool:
-        ret: boot = False
-        if Regex.IsMatch(txt, "^[bmpBMP]"):
-            ret = true
+        ret: bool = False
+        if re.search("^[bmpBMP]", txt):
+            ret = True
         return ret
 
     # Character types, for convenience when writing regular expressions:
@@ -318,12 +320,11 @@ class Opers:
     def Slenderize(bayse: str) -> str:
         ret: str = bayse
 
-        sources: tuple[str] = ("ea", "éa", "ia", "ío", "io", "iu", "ae")
-        targets: tuple[str] = ("i", "éi", "éi", "í", "i", "i", "aei")
-        match: Match
+        sources: Sequence[str] = ("ea", "éa", "ia", "ío", "io", "iu", "ae")
+        targets: Sequence[str] = ("i", "éi", "éi", "í", "i", "i", "aei")
+        match: Optional[re.Match]
         for source, target in zip(sources, targets):
-            match = Regex.Match(
-                bayse,
+            match = re.search(
                 "^(.*["
                 + Opers.Cosonants
                 + "])?"
@@ -331,17 +332,18 @@ class Opers:
                 + "(["
                 + Opers.Cosonants
                 + "]+)$",
+                bayse,
             )
-            if match.Success:
-                ret = match.Groups[1].Value + target + match.Groups[2].Value
+            if match:
+                ret = match.group(1) + target + match.group(2)
                 return ret
 
         # The generic case: insert "i" at the end of the vowel cluster:
-        match = Regex.Match(
-            bayse, "^(.*[" + Opers.VowelsBroad + "])([" + Opers.Cosonants + "]+)$"
+        match = re.search(
+            "^(.*[" + Opers.VowelsBroad + "])([" + Opers.Cosonants + "]+)$", bayse
         )
-        if match.Success:
-            ret = match.Groups[1].Value + "i" + match.Groups[2].Value
+        if match:
+            ret = match.group(1) + "i" + match.group(2)
 
         return ret
 
@@ -350,14 +352,13 @@ class Opers:
     # Note: if the target does not end in a slender vowel, then regular slenderization is attempted instead.
     # Note: a base that's already attenuated passes through unchanged.
     @staticmethod
-    def Slenderize(bayse: str, target: str) -> str:
+    def SlenderizeWithTarget(bayse: str, target: str) -> str:
         ret: str = bayse
-        if not Regex.IsMatch(target, "[" + Opers.VowelsSlender + "]$"):
+        if not re.search("[" + Opers.VowelsSlender + "]$", target):
             ret = Opers.Slenderize(bayse)
             # attempt regular slenderization instead
         else:
-            match: Match = Regex.Match(
-                bayse,
+            match: Optional[re.Match] = re.search(
                 "^(.*?)["
                 + Opers.Vowels
                 + "]*["
@@ -365,9 +366,10 @@ class Opers:
                 + "](["
                 + Opers.Cosonants
                 + "]+)$",
+                bayse,
             )
-            if match.Success:
-                ret = match.Groups[1].Value + target + match.Groups[2].Value
+            if match:
+                ret = match.group(1) + target + match.group(2)
         return ret
 
     # Performs regular broadening: if the base ends in a consonant, and if the vowel cluster immediately before this consonant
@@ -377,12 +379,11 @@ class Opers:
     def Broaden(bayse: str) -> str:
         ret: str = bayse
 
-        sources: tuple[str] = ("ói", "ei", "éi", "i", "aí", "í", "ui", "io")
-        targets: tuple[str] = ("ó", "ea", "éa", "ea", "aío", "ío", "o", "ea")
-        match: Match
+        sources: Sequence[str] = ("ói", "ei", "éi", "i", "aí", "í", "ui", "io")
+        targets: Sequence[str] = ("ó", "ea", "éa", "ea", "aío", "ío", "o", "ea")
+        match: Optional[re.Match]
         for source, target in zip(sources, targets):
-            match = Regex.Match(
-                bayse,
+            match = re.search(
                 "^(.*["
                 + Opers.Cosonants
                 + "])?"
@@ -390,15 +391,16 @@ class Opers:
                 + "(["
                 + Opers.Cosonants
                 + "]+)$",
+                bayse,
             )
-            if match.Success:
-                ret = match.Groups[1].Value + target + match.Groups[2].Value
+            if match:
+                ret = match.group(1) + target + match.group(2)
                 return ret
 
         # The generic case: remove "i" from the end of the vowel cluster:
-        match = Regex.Match(bayse, "^(.*)i([" + Opers.Cosonants + "]+)$")
-        if match.Success:
-            ret = match.Groups[1].Value + match.Groups[2].Value
+        match = re.search("^(.*)i([" + Opers.Cosonants + "]+)$", bayse)
+        if match:
+            ret = match.group(1) + match.group(2)
 
         return ret
 
@@ -407,14 +409,13 @@ class Opers:
     # Note: if the target does not end in a broad vowel, then regular broadening is attempted instead.
     # Note: a base that's already broad passes through unchanged.
     @staticmethod
-    def Broaden(bayse: str, target: str) -> str:
+    def BroadenWithTarget(bayse: str, target: str) -> str:
         ret: str = bayse
-        if not Regex.IsMatch(target, "[" + Opers.VowelsBroad + "]$"):
+        if not re.search("[" + Opers.VowelsBroad + "]$", target):
             ret = Opers.Broaden(bayse)
             # attempt regular broadening instead
         else:
-            match: Match = Regex.Match(
-                bayse,
+            match: Optional[re.Match] = re.search(
                 "^(.*?)["
                 + Opers.Vowels
                 + "]*["
@@ -422,9 +423,10 @@ class Opers:
                 + "](["
                 + Opers.Cosonants
                 + "]+)$",
+                bayse,
             )
-            if match.Success:
-                ret = match.Groups[1].Value + target + match.Groups[2].Value
+            if match:
+                ret = match.group(1) + target + match.group(2)
         return ret
 
     # If the final consonant cluster consists of two consonants that differ in voicing,
@@ -432,9 +434,9 @@ class Opers:
     @staticmethod
     def Devoice(bayse: str) -> str:
         ret: str = bayse
-        match: Match = Regex.Match(bayse, "^(.*)sd$")
-        if match.Success:
-            ret = match.Groups[1].Value + "st"
+        match: Optional[re.Match] = re.search("^(.*)sd$", bayse)
+        if match:
+            ret = match.group(1) + "st"
             return ret
         # May need elaboration.
         return ret
@@ -444,11 +446,11 @@ class Opers:
     def Unduplicate(bayse: str) -> str:
         ret: str = bayse
 
-        match: Match = Regex.Match(
-            bayse, "^.*[" + Opers.Cosonants + "][" + Opers.Cosonants + "]$"
+        match: Optional[re.Match] = re.search(
+            "^.*[" + Opers.Cosonants + "][" + Opers.Cosonants + "]$", bayse
         )
-        if match.Success and bayse[bayse.Length - 1] == bayse[bayse.Length - 2]:
-            ret = bayse.Substring(0, bayse.Length - 1)
+        if match and bayse[len(bayse) - 1] == bayse[len(bayse) - 2]:
+            ret = bayse[: len(bayse) - 1]
 
         return ret
 
@@ -458,8 +460,7 @@ class Opers:
     def Syncope(bayse: str) -> str:
         ret: str = bayse
 
-        match: Match = Regex.Match(
-            bayse,
+        match: Optional[re.Match] = re.search(
             "^(.*["
             + Opers.Cosonants
             + "])?["
@@ -467,89 +468,66 @@ class Opers:
             + "]+(["
             + Opers.Cosonants
             + "]+)$",
+            bayse,
         )
-        if match.Success:
-            ret = Opers.Devoice(
-                Opers.Unduplicate(match.Groups[1].Value + match.Groups[2].Value)
-            )
+        if match:
+            ret = Opers.Devoice(Opers.Unduplicate(match.group(1) + match.group(2)))
 
         return ret
 
     @staticmethod
-    def HighlightMutations(text: str) -> str:
-        return HighlightMutations(text, "")
-
-    @staticmethod
-    def HighlightMutations(text: str, bayse: str) -> str:
-        text = Regex.Replace(
-            text, "(^| )([cdfgmpst])(h)", "$1$2<u class='lenition'>$3</u>", re.I
+    def HighlightMutations(text: str, bayse: str = "") -> str:
+        text = re.sub(
+            "(^| )([cdfgmpst])(h)", r"\1\2<u class='lenition'>\3</u>", text, re.I
         )
-        text = Regex.Replace(
-            text, "(^| )(b)(h)([^f])", "$1$2<u class='lenition'>$3</u>$4", re.I
+        text = re.sub(
+            "(^| )(b)(h)([^f])", r"\1\2<u class='lenition'>\3</u>$4", text, re.I
         )
-        text = Regex.Replace(
-            text, "(^| )(t)(s)", "$1<u class='lenition'>$2</u>$3", re.I
+        text = re.sub("(^| )(t)(s)", r"\1<u class='lenition'>\2</u>\3", text, re.I)
+        text = re.sub("(^| )(m)(b)", r"\1<u class='eclipsis'>\2</u>\3", text, re.I)
+        text = re.sub("(^| )(g)(c)", r"\1<u class='eclipsis'>\2</u>\3", text, re.I)
+        text = re.sub("(^| )(n)(d)", r"\1<u class='eclipsis'>\2</u>\3", text, re.I)
+        text = re.sub("(^| )(bh)(f)", r"\1<u class='eclipsis'>\2</u>\3", text, re.I)
+        text = re.sub("(^| )(n)(g)", r"\1<u class='eclipsis'>\2</u>\3", text, re.I)
+        text = re.sub("(^| )(b)(p)", r"\1<u class='eclipsis'>\2</u>\3", text, re.I)
+        text = re.sub("(^| )(d)(t)", r"\1<u class='eclipsis'>\2</u>\3", text, re.I)
+        text = re.sub(
+            "(^| )(n-)([aeiouáéíóú])", r"\1<u class='eclipsis'>\2</u>\3", text
         )
-        text = Regex.Replace(
-            text, "(^| )(m)(b)", "$1<u class='eclipsis'>$2</u>$3", re.I
-        )
-        text = Regex.Replace(
-            text, "(^| )(g)(c)", "$1<u class='eclipsis'>$2</u>$3", re.I
-        )
-        text = Regex.Replace(
-            text, "(^| )(n)(d)", "$1<u class='eclipsis'>$2</u>$3", re.I
-        )
-        text = Regex.Replace(
-            text, "(^| )(bh)(f)", "$1<u class='eclipsis'>$2</u>$3", re.I
-        )
-        text = Regex.Replace(
-            text, "(^| )(n)(g)", "$1<u class='eclipsis'>$2</u>$3", re.I
-        )
-        text = Regex.Replace(
-            text, "(^| )(b)(p)", "$1<u class='eclipsis'>$2</u>$3", re.I
-        )
-        text = Regex.Replace(
-            text, "(^| )(d)(t)", "$1<u class='eclipsis'>$2</u>$3", re.I
-        )
-        text = Regex.Replace(
-            text, "(^| )(n-)([aeiouáéíóú])", "$1<u class='eclipsis'>$2</u>$3"
-        )
-        if not bayse.StartsWith("n"):
-            text = Regex.Replace(
-                text, "(^| )(n)([AEIOUÁÉÍÓÚ])", "$1<u class='eclipsis'>$2</u>$3"
+        if not bayse.startswith("n"):
+            text = re.sub(
+                "(^| )(n)([AEIOUÁÉÍÓÚ])", r"\1<u class='eclipsis'>\2</u>\3", text
             )
-        if not bayse.StartsWith("t-"):
-            text = Regex.Replace(
-                text, "(^| )(t-)([aeiouáéíóú])", "$1<u class='lenition'>$2</u>$3"
+        if not bayse.startswith("t-"):
+            text = re.sub(
+                "(^| )(t-)([aeiouáéíóú])", r"\1<u class='lenition'>\2</u>\3", text
             )
-        if not bayse.StartsWith("t"):
-            text = Regex.Replace(
-                text, "(^| )(t)([AEIOUÁÉÍÓÚ])", "$1<u class='lenition'>$2</u>$3"
+        if not bayse.startswith("t"):
+            text = re.sub(
+                "(^| )(t)([AEIOUÁÉÍÓÚ])", r"\1<u class='lenition'>\2</u>\3", text
             )
-        if not bayse.StartsWith("h"):
-            text = Regex.Replace(
-                text, "(^| )(h)([aeiouáéíóú])", "$1<u class='lenition'>$2</u>$3", re.I
+        if not bayse.startswith("h"):
+            text = re.sub(
+                "(^| )(h)([aeiouáéíóú])", r"\1<u class='lenition'>\2</u>\3", text, re.I
             )
         return text
 
-    @staticmethod
-    def Prefix(prefix: str, body: str) -> str:
+    @classmethod
+    def Prefix(cls, prefix: str, body: str) -> str:
         m: Mutation = Mutation.Len1
         if Opers.EndsDental(prefix):
             m = Mutation.Len2
             # pick the right mutation
-        if prefix.Substring(prefix.Length - 1) == body.Substring(0):
+        if prefix[len(prefix) - 1] == body[0]:
             prefix += "-"
             # eg. "sean-nós"
-        if EndsVowel(prefix) and StartsVowel(body):
+        if cls.EndsVowel(prefix) and cls.StartsVowel(body):
             prefix += "-"
             # eg. "ró-éasca"
-        if (
-            body.Substring(0, 1) == body.Substring(0, 1).ToUpper()
-        ):  # eg. "seanÉireannach" > "Sean-Éireannach"
-            prefix = prefix.Substring(0, 1).ToUpper() + prefix.Substring(1)
-            if not prefix.EndsWith("-"):
+        if body[0:1] == body[0:1].upper():  # eg. "seanÉireannach" > "Sean-Éireannach"
+            prefix = prefix[0:1].upper() + prefix[1:]
+            if not prefix.endswith("-"):
                 prefix += "-"
 
-        ret: str = prefix + Mutate(m, body)
+        ret: str = prefix + cls.Mutate(m, body)
         return ret

@@ -3,8 +3,13 @@ from enum import Enum, auto
 
 # Enumerations for various grammatical features:
 
+# https://docs.python.org/3/library/enum.html#using-automatic-values
+class AutoName(Enum):
+    def _generate_next_value_(name, start, count, last_values):
+        return name
 
-class Mutation:
+
+class Mutation(AutoName):
     Nil = auto()
     Len1 = auto()
     Len2 = auto()
@@ -20,17 +25,17 @@ class Mutation:
     Len3D = auto()
 
 
-class Strength:
+class Strength(AutoName):
     Strong = auto()
     Weak = auto()
 
 
-class Number:
+class Number(AutoName):
     Sg = auto()
     Pl = auto()
 
 
-class Gender:
+class Gender(AutoName):
     Masc = auto()
     Fem = auto()
 
@@ -42,11 +47,13 @@ class Form:
 
 
 # Class for noun and noun phrase forms in the singular:
+@dataclass
 class FormSg(Form):
     gender: Gender
 
 
 # Class for noun forms in the plural genitive:
+@dataclass
 class FormPlGen(Form):
     strength: Strength
     # in the plural genitive, a noun form has strength.

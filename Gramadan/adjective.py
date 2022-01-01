@@ -1,7 +1,12 @@
-﻿import xml.etree.ElementTree as ET
+﻿from __future__ import annotations
+
+from lxml import etree as ET
+import re
 from typing import List, Optional, Union
-from singular_info import SingularInfo
-from features import Form
+from .singular_info import SingularInfo
+from .features import Form, Mutation
+from .opers import Opers
+from .utils import to_bool
 
 
 class Adjective:
@@ -10,63 +15,57 @@ class Adjective:
     isPre: bool = False
 
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET.ElementTree]):
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> Adjective:
         if isinstance(doc, str):
             xml = ET.parse(doc)
             return cls.create_from_xml(xml)
 
         root = doc.getroot()
-        disambig = root.GetAttribute("disambig")
+        disambig = root.get("disambig")
 
-        kwargs = {}
         try:
-            kwargs["declension"] = int(root.GetAttribute("declension"))
+            declension = int(root.get("declension", 0))
         except:
-            pass
+            declension = 0
+
         try:
-            kwargs["isPre"] = bool(root.GetAttribute("isPre"))
+            isPre = to_bool(root.get("isPre", False))
         except:
-            pass
+            isPre = False
 
         sgNom: list[Form] = []
-        el: XmlElement
-        for el in doc.SelectNodes("/*/sgNom"):
-            sgNom.Add(Form(el.GetAttribute("default")))
+        el: ET._Element
+
+        for el in root.findall("./sgNom"):
+            sgNom.append(Form(el.get("default", "")))
 
         sgGenMasc: list[Form] = []
-        el: XmlElement
-        for el in doc.SelectNodes("/*/sgGenMasc"):
-            sgGenMasc.Add(Form(el.GetAttribute("default")))
+        for el in root.findall("./sgGenMasc"):
+            sgGenMasc.append(Form(el.get("default", "")))
 
-        sgGenMasc: list[Form] = []
-        el: XmlElement
-        for el in doc.SelectNodes("/*/sgGenFem"):
-            sgGenFem.Add(Form(el.GetAttribute("default")))
+        sgGenFem: list[Form] = []
+        for el in root.findall("./sgGenFem"):
+            sgGenFem.append(Form(el.get("default", "")))
 
         sgVocMasc: list[Form] = []
-        el: XmlElement
-        for el in doc.SelectNodes("/*/sgVocMasc"):
-            sgVocMasc.Add(Form(el.GetAttribute("default")))
+        for el in root.findall("./sgVocMasc"):
+            sgVocMasc.append(Form(el.get("default", "")))
 
         sgVocFem: list[Form] = []
-        el: XmlElement
-        for el in doc.SelectNodes("/*/sgVocFem"):
-            sgVocFem.Add(Form(el.GetAttribute("default")))
+        for el in root.findall("./sgVocFem"):
+            sgVocFem.append(Form(el.get("default", "")))
 
         plNom: list[Form] = []
-        el: XmlElement
-        for el in doc.SelectNodes("/*/plNom"):
-            plNom.Add(Form(el.GetAttribute("default")))
+        for el in root.findall("./plNom"):
+            plNom.append(Form(el.get("default", "")))
 
         graded: list[Form] = []
-        el: XmlElement
-        for el in doc.SelectNodes("/*/graded"):
-            graded.Add(Form(el.GetAttribute("default")))
+        for el in root.findall("./graded"):
+            graded.append(Form(el.get("default", "")))
 
         abstractNoun: list[Form] = []
-        el: XmlElement
-        for el in doc.SelectNodes("/*/abstractNoun"):
-            abstractNoun.Add(Form(el.GetAttribute("default")))
+        for el in root.findall("./abstractNoun"):
+            abstractNoun.append(Form(el.get("default", "")))
 
         return cls(
             sgNom=sgNom,
@@ -78,7 +77,8 @@ class Adjective:
             graded=graded,
             abstractNoun=abstractNoun,
             disambig=disambig,
-            **kwargs
+            declension=declension,
+            isPre=isPre,
         )
 
     @classmethod
@@ -88,32 +88,36 @@ class Adjective:
         sgFem: SingularInfo,
         plural_or_graded: Optional[str],
         graded: Optional[str],
-    ):
+    ) -> Adjective:
+        graded_: str = ""
         if graded is None:
             plural = None
-            graded = plural_or_graded
+            if plural_or_graded is not None:
+                graded_ = plural_or_graded
         else:
             plural = plural_or_graded
+            graded_ = graded
+
         return cls(
             sgNom=sgMasc.nominative,
             sgGenMasc=sgMasc.genitive,
             sgGenFem=sgFem.genitive,
             sgVocMasc=sgMasc.vocative,
             sgVocFem=sgFem.vocative,
-            plural=None if plural is None else [Form(plural)],
-            graded=[Form(graded)],
+            plNom=None if plural is None else [Form(plural)],
+            graded=[Form(graded_)],
         )
 
     def __init__(
         self,
-        sgNom: list[Form] = None,
-        sgGenMasc: list[Form] = None,
-        sgGenFem: list[Form] = None,
-        sgVocMasc: list[Form] = None,
-        sgVocFem: list[Form] = None,
-        plNom: list[Form] = None,
-        graded: list[Form] = None,
-        abstractNoun: list[Form] = None,
+        sgNom: Optional[list[Form]] = None,
+        sgGenMasc: Optional[list[Form]] = None,
+        sgGenFem: Optional[list[Form]] = None,
+        sgVocMasc: Optional[list[Form]] = None,
+        sgVocFem: Optional[list[Form]] = None,
+        plNom: Optional[list[Form]] = None,
+        graded: Optional[list[Form]] = None,
+        abstractNoun: Optional[list[Form]] = None,
         disambig="",
         declension: int = 0,
         isPre: bool = False,
@@ -143,7 +147,7 @@ class Adjective:
         # Whether the adjective is a prefix (like "sean"):
 
     # Returns the adjective's lemma:
-    def getLemma() -> str:
+    def getLemma(self) -> str:
         ret: str = ""
         lemmaForm: Form = self.sgNom[0]
         if lemmaForm is not None:
@@ -152,113 +156,109 @@ class Adjective:
         return ret
 
     # These return graded forms of the adjective:
-    def getComparPres() -> list[Form]:  # comparative present, eg. "níos mó"
+    def getComparPres(self) -> list[Form]:  # comparative present, eg. "níos mó"
         ret: list[Form] = []
         gradedForm: Form
-        for gradedForm in graded:
-            ret.Add(Form("níos " + gradedForm.value))
+        for gradedForm in self.graded:
+            ret.append(Form("níos " + gradedForm.value))
         return ret
 
-    def getSuperPres() -> list[Form]:  # superlative present, eg. "is mó"
+    def getSuperPres(self) -> list[Form]:  # superlative present, eg. "is mó"
         ret: list[Form] = []
         gradedForm: Form
-        for gradedForm in graded:
-            ret.Add(Form("is " + gradedForm.value))
+        for gradedForm in self.graded:
+            ret.append(Form("is " + gradedForm.value))
         return ret
 
-    def getComparPast() -> list[Form]:  # comparative past/conditional, eg. "ní ba mhó"
+    def getComparPast(
+        self,
+    ) -> list[Form]:  # comparative past/conditional, eg. "ní ba mhó"
         ret: list[Form] = []
         gradedForm: Form
-        for gradedForm in graded:
+        for gradedForm in self.graded:
             form: str = ""
-            if Regex.IsMatch(gradedForm.value, "^[aeiouáéíóúAEIOUÁÉÍÓÚ]"):
+            if re.search("^[aeiouáéíóúAEIOUÁÉÍÓÚ]", gradedForm.value):
                 form = "ní b'" + gradedForm.value
-            elif Regex.IsMatch(gradedForm.value, "^f[aeiouáéíóúAEIOUÁÉÍÓÚ]"):
+            elif re.search("^f[aeiouáéíóúAEIOUÁÉÍÓÚ]", gradedForm.value):
                 form = "ní b'" + Opers.Mutate(Mutation.Len1, gradedForm.value)
             else:
                 form = "ní ba " + Opers.Mutate(Mutation.Len1, gradedForm.value)
-            ret.Add(Form(form))
+            ret.append(Form(form))
         return ret
 
-    def getSuperPast() -> list[Form]:  # superlative past/conditional, eg. "ba mhó"
+    def getSuperPast(self) -> list[Form]:  # superlative past/conditional, eg. "ba mhó"
         ret: list[Form] = []
         gradedForm: Form
-        for gradedForm in graded:
+        for gradedForm in self.graded:
             form: str = ""
-            if Regex.IsMatch(gradedForm.value, "^[aeiouáéíóúAEIOUÁÉÍÓÚ]"):
+            if re.search("^[aeiouáéíóúAEIOUÁÉÍÓÚ]", gradedForm.value):
                 form = "ab " + gradedForm.value
-            elif Regex.IsMatch(gradedForm.value, "^f"):
+            elif re.search("^f", gradedForm.value):
                 form = "ab " + Opers.Mutate(Mutation.Len1, gradedForm.value)
             else:
                 form = "ba " + Opers.Mutate(Mutation.Len1, gradedForm.value)
-            ret.Add(Form(form))
+            ret.append(Form(form))
         return ret
 
-    def getNickname() -> str:
-        ret: str = getLemma()
+    def getNickname(self) -> str:
+        ret: str = self.getLemma()
         ret += " adj"
-        ret += self.declension.ToString() if self.declension > 0 else ""
+        ret += str(self.declension) if self.declension > 0 else ""
         if self.disambig != "":
             ret += " " + self.disambig
-        ret = ret.Replace(" ", "_")
+        ret = ret.replace(" ", "_")
         return ret
 
-    def getFriendlyNickname() -> str:
-        ret: str = getLemma()
+    def getFriendlyNickname(self) -> str:
+        ret: str = self.getLemma()
         ret += " (adj"
-        ret += self.declension.ToString() if self.declension > 0 else ""
+        ret += str(self.declension) if self.declension > 0 else ""
         if self.disambig != "":
             ret += " " + self.disambig
         ret += ")"
         return ret
 
     # Prints the adjective in BuNaMo format:
-    def printXml() -> ET.ElementTree:
-        root: ET.Element = ET.Element("adjective")
-        doc: ET.ElementTree = ET.ElementTree(root)
+    def printXml(self) -> ET._ElementTree:
+        root: ET._Element = ET.Element("adjective")
+        doc: ET._ElementTree = ET.ElementTree(root)
         root.set("default", self.getLemma())
-        root.set("declension", self.declension.ToString())
+        root.set("declension", str(self.declension))
         root.set("disambig", self.disambig)
-        root.set("isPre", self.isPre.ToString())
+        root.set("isPre", str(self.isPre))
 
         f: Form
+        e: ET._Element
         for f in self.sgNom:
-            el: ET.Element = ET.SubElement(root, "sgNom")
+            el = ET.SubElement(root, "sgNom")
             el.set("default", f.value)
 
-        f: Form
         for f in self.sgGenMasc:
-            el: ET.Element = ET.SubElement(root, "sgGenMasc")
+            el = ET.SubElement(root, "sgGenMasc")
             el.set("default", f.value)
 
-        f: Form
         for f in self.sgGenFem:
-            el: ET.Element = ET.SubElement(root, "sgGenFem")
+            el = ET.SubElement(root, "sgGenFem")
             el.set("default", f.value)
 
-        f: Form
         for f in self.sgVocMasc:
-            el: ET.Element = ET.SubElement(root, "sgVocMasc")
+            el = ET.SubElement(root, "sgVocMasc")
             el.set("default", f.value)
 
-        f: Form
         for f in self.sgVocFem:
-            el: ET.Element = ET.SubElement(root, "sgVocFem")
+            el = ET.SubElement(root, "sgVocFem")
             el.set("default", f.value)
 
-        f: Form
         for f in self.plNom:
-            el: ET.Element = ET.SubElement(root, "plNom")
+            el = ET.SubElement(root, "plNom")
             el.set("default", f.value)
 
-        f: Form
         for f in self.graded:
-            el: ET.Element = ET.SubElement(root, "graded")
+            el = ET.SubElement(root, "graded")
             el.set("default", f.value)
 
-        f: Form
         for f in self.abstractNoun:
-            el: ET.Element = ET.SubElement(root, "abstractNoun")
+            el = ET.SubElement(root, "abstractNoun")
             el.set("default", f.value)
 
         return doc

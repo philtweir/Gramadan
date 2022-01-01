@@ -1,10 +1,15 @@
-﻿from noun import Noun
-from verb import Verb
-from possessive import Possessive
-from np import NP
-from pp import PP
-from adjective import Adjective
-from preposition import Preposition
+﻿import re
+
+from .noun import Noun
+from .verb import Verb
+from .possessive import Possessive
+from .np import NP
+from .pp import PP
+from .vp import VP, VPTense, VPPerson, VPPolarity, VPShape, VPMood
+from .adjective import Adjective
+from .preposition import Preposition
+from .features import Gender, Form, Mutation
+from .opers import Opers
 
 
 class PrinterNeid:
@@ -14,7 +19,7 @@ class PrinterNeid:
         self.withXmlDeclarations = withXmlDeclarations
 
     def printNounXml(self, n: Noun) -> str:
-        np: NP = NP(n)
+        np: NP = NP.create_from_noun(n)
 
         ret: str = ""
         if self.withXmlDeclarations:
@@ -32,19 +37,19 @@ class PrinterNeid:
             "<noun gender='"
             + ("masc" if n.getGender() == Gender.Masc else "fem")
             + "' declension='"
-            + n.declension
+            + str(n.declension)
             + "'>\n"
         )
         # Singular nominative:
         for i in range(max(len(np.sgNom), len(np.sgNomArt))):
             ret += "\t<sgNom>\n"
-            if np.sgNom.Count > i:
+            if len(np.sgNom) > i:
                 ret += (
                     "\t\t<articleNo>"
                     + self._clean4xml(np.sgNom[i].value)
                     + "</articleNo>\n"
                 )
-            if np.sgNomArt.Count > i:
+            if len(np.sgNomArt) > i:
                 ret += (
                     "\t\t<articleYes>"
                     + self._clean4xml(np.sgNomArt[i].value)
@@ -55,13 +60,13 @@ class PrinterNeid:
         # Singular genitive:
         for i in range(max(len(np.sgGen), len(np.sgGenArt))):
             ret += "\t<sgGen>\n"
-            if np.sgGen.Count > i:
+            if len(np.sgGen) > i:
                 ret += (
                     "\t\t<articleNo>"
                     + self._clean4xml(np.sgGen[i].value)
                     + "</articleNo>\n"
                 )
-            if np.sgGenArt.Count > i:
+            if len(np.sgGenArt) > i:
                 ret += (
                     "\t\t<articleYes>"
                     + self._clean4xml(np.sgGenArt[i].value)
@@ -72,13 +77,13 @@ class PrinterNeid:
         # Plural nominative:
         for i in range(max(len(np.plNom), len(np.plNomArt))):
             ret += "\t<plNom>\n"
-            if np.plNom.Count > i:
+            if len(np.plNom) > i:
                 ret += (
                     "\t\t<articleNo>"
                     + self._clean4xml(np.plNom[i].value)
                     + "</articleNo>\n"
                 )
-            if np.plNomArt.Count > i:
+            if len(np.plNomArt) > i:
                 ret += (
                     "\t\t<articleYes>"
                     + self._clean4xml(np.plNomArt[i].value)
@@ -89,13 +94,13 @@ class PrinterNeid:
         # Plural genitive:
         for i in range(max(len(np.plGen), len(np.plGenArt))):
             ret += "\t<plGen>\n"
-            if np.plGen.Count > i:
+            if len(np.plGen) > i:
                 ret += (
                     "\t\t<articleNo>"
                     + self._clean4xml(np.plGen[i].value)
                     + "</articleNo>\n"
                 )
-            if np.plGenArt.Count > i:
+            if len(np.plGenArt) > i:
                 ret += (
                     "\t\t<articleYes>"
                     + self._clean4xml(np.plGenArt[i].value)
@@ -109,6 +114,7 @@ class PrinterNeid:
 
     def printAdjectiveXml(self, a: Adjective) -> str:
         ret: str = ""
+        f: Form
 
         if self.withXmlDeclarations:
             ret += "<?xml version='1.0' encoding='utf-8'?>\n"
@@ -121,59 +127,58 @@ class PrinterNeid:
             + self._clean4xml(a.getNickname())
             + "'>\n"
         )
-        ret += "<adjective declension='" + a.declension + "'>\n"
-        f: Form
+        ret += "<adjective declension='" + str(a.declension) + "'>\n"
         for f in a.sgNom:
             ret += "\t<sgNomMasc>" + self._clean4xml(f.value) + "</sgNomMasc>\n"
-        f: Form
+
         for f in a.sgNom:
             ret += (
                 "\t<sgNomFem>"
                 + self._clean4xml(Opers.Mutate(Mutation.Len1, f.value))
                 + "</sgNomFem>\n"
             )
-        f: Form
+
         for f in a.sgGenMasc:
             ret += (
                 "\t<sgGenMasc>"
                 + self._clean4xml(Opers.Mutate(Mutation.Len1, f.value))
                 + "</sgGenMasc>\n"
             )
-        f: Form
+
         for f in a.sgGenFem:
             ret += "\t<sgGenFem>" + self._clean4xml(f.value) + "</sgGenFem>\n"
-        f: Form
+
         for f in a.plNom:
             ret += "\t<plNom>" + self._clean4xml(f.value) + "</plNom>\n"
-        f: Form
+
         for f in a.plNom:
             ret += (
                 "\t<plNomSlen>"
                 + self._clean4xml(Opers.Mutate(Mutation.Len1, f.value))
                 + "</plNomSlen>\n"
             )
-        f: Form
+
         for f in a.plNom:
             ret += "\t<plGenStrong>" + self._clean4xml(f.value) + "</plGenStrong>\n"
-        f: Form
+
         for f in a.sgNom:
             ret += "\t<plGenWeak>" + self._clean4xml(f.value) + "</plGenWeak>\n"
-        f: Form
+
         for f in a.getComparPres():
             ret += "\t<comparPres>" + self._clean4xml(f.value) + "</comparPres>\n"
-        f: Form
+
         for f in a.getComparPast():
             ret += "\t<comparPast>" + self._clean4xml(f.value) + "</comparPast>\n"
-        f: Form
+
         for f in a.getSuperPres():
             ret += "\t<superPres>" + self._clean4xml(f.value) + "</superPres>\n"
-        f: Form
+
         for f in a.getSuperPast():
             ret += "\t<superPast>" + self._clean4xml(f.value) + "</superPast>\n"
-        f: Form
+
         for f in a.abstractNoun:
             ret += "\t<abstractNoun>" + self._clean4xml(f.value) + "</abstractNoun>\n"
-        f: Form
+
         for f in a.abstractNoun:
             ret += "\t<abstractNounExamples>\n"
             ret += (
@@ -181,7 +186,7 @@ class PrinterNeid:
                 + self._clean4xml("dá " + Opers.Mutate(Mutation.Len1, f.value))
                 + "</example>\n"
             )
-            if Regex.IsMatch(f.value, "^[" + Opers.Vowels + "]"):
+            if re.search("^[" + Opers.Vowels + "]", f.value):
                 ret += (
                     "\t\t<example>"
                     + self._clean4xml(
@@ -227,13 +232,13 @@ class PrinterNeid:
         # Singular nominative:
         for i in range(max(len(np.sgNom), len(np.sgNomArt))):
             ret += "\t<sgNom>\n"
-            if np.sgNom.Count > i:
+            if len(np.sgNom) > i:
                 ret += (
                     "\t\t<articleNo>"
                     + self._clean4xml(np.sgNom[i].value)
                     + "</articleNo>\n"
                 )
-            if np.sgNomArt.Count > i:
+            if len(np.sgNomArt) > i:
                 ret += (
                     "\t\t<articleYes>"
                     + self._clean4xml(np.sgNomArt[i].value)
@@ -244,13 +249,13 @@ class PrinterNeid:
         # Singular genitive:
         for i in range(max(len(np.sgGen), len(np.sgGenArt))):
             ret += "\t<sgGen>\n"
-            if np.sgGen.Count > i:
+            if len(np.sgGen) > i:
                 ret += (
                     "\t\t<articleNo>"
                     + self._clean4xml(np.sgGen[i].value)
                     + "</articleNo>\n"
                 )
-            if np.sgGenArt.Count > i:
+            if len(np.sgGenArt) > i:
                 ret += (
                     "\t\t<articleYes>"
                     + self._clean4xml(np.sgGenArt[i].value)
@@ -261,13 +266,13 @@ class PrinterNeid:
         # Plural nominative:
         for i in range(max(len(np.plNom), len(np.plNomArt))):
             ret += "\t<plNom>\n"
-            if np.plNom.Count > i:
+            if len(np.plNom) > i:
                 ret += (
                     "\t\t<articleNo>"
                     + self._clean4xml(np.plNom[i].value)
                     + "</articleNo>\n"
                 )
-            if np.plNomArt.Count > i:
+            if len(np.plNomArt) > i:
                 ret += (
                     "\t\t<articleYes>"
                     + self._clean4xml(np.plNomArt[i].value)
@@ -278,13 +283,13 @@ class PrinterNeid:
         # Plural genitive:
         for i in range(max(len(np.plGen), len(np.plGenArt))):
             ret += "\t<plGen>\n"
-            if np.plGen.Count > i:
+            if len(np.plGen) > i:
                 ret += (
                     "\t\t<articleNo>"
                     + self._clean4xml(np.plGen[i].value)
                     + "</articleNo>\n"
                 )
-            if np.plGenArt.Count > i:
+            if len(np.plGenArt) > i:
                 ret += (
                     "\t\t<articleYes>"
                     + self._clean4xml(np.plGenArt[i].value)
@@ -296,7 +301,7 @@ class PrinterNeid:
         ret += "</Lemma>"
         return ret
 
-    def printPPXml(self, pp: PP):
+    def printPPXml(self, pp: PP) -> str:
         ret: str = ""
         if self.withXmlDeclarations:
             ret += "<?xml version='1.0' encoding='utf-8'?>\n"
@@ -313,13 +318,13 @@ class PrinterNeid:
         # Singular nominative:
         for i in range(max(len(pp.sg), len(pp.sgArtS), len(pp.sgArtN))):
             ret += "\t<sg>\n"
-            if pp.sg.Count > i:
+            if len(pp.sg) > i:
                 ret += (
                     "\t\t<articleNo>"
                     + self._clean4xml(pp.sg[i].value)
                     + "</articleNo>\n"
                 )
-            if pp.sgArtS.Count > i and pp.sgArtN.Count > i:
+            if len(pp.sgArtS) > i and len(pp.sgArtN) > i:
                 if pp.sgArtS[i].value == pp.sgArtN[i].value:
                     ret += (
                         "\t\t<articleYes>"
@@ -338,13 +343,13 @@ class PrinterNeid:
                         + "</articleYes>\n"
                     )
             else:
-                if pp.sgArtS.Count > i:
+                if len(pp.sgArtS) > i:
                     ret += (
                         "\t\t<articleYes>"
                         + self._clean4xml(pp.sgArtS[i].value)
                         + "</articleYes>\n"
                     )
-                if pp.sgArtN.Count > i:
+                if len(pp.sgArtN) > i:
                     ret += (
                         "\t\t<articleYes>"
                         + self._clean4xml(pp.sgArtN[i].value)
@@ -355,13 +360,13 @@ class PrinterNeid:
         # Plural nominative:
         for i in range(max(len(pp.pl), len(pp.plArt))):
             ret += "\t<pl>\n"
-            if pp.pl.Count > i:
+            if len(pp.pl) > i:
                 ret += (
                     "\t\t<articleNo>"
                     + self._clean4xml(pp.pl[i].value)
                     + "</articleNo>\n"
                 )
-            if pp.plArt.Count > i:
+            if len(pp.plArt) > i:
                 ret += (
                     "\t\t<articleYes>"
                     + self._clean4xml(pp.plArt[i].value)
@@ -392,22 +397,22 @@ class PrinterNeid:
         f: Form
         for f in p.sg1:
             ret += "\t<persSg1>" + f.value + "</persSg1>\n"
-        f: Form
+
         for f in p.sg2:
             ret += "\t<persSg2>" + f.value + "</persSg2>\n"
-        f: Form
+
         for f in p.sg3Masc:
             ret += "\t<persSg3Masc>" + f.value + "</persSg3Masc>\n"
-        f: Form
+
         for f in p.sg3Fem:
             ret += "\t<persSg3Fem>" + f.value + "</persSg3Fem>\n"
-        f: Form
+
         for f in p.pl1:
             ret += "\t<persPl1>" + f.value + "</persPl1>\n"
-        f: Form
+
         for f in p.pl2:
             ret += "\t<persPl2>" + f.value + "</persPl2>\n"
-        f: Form
+
         for f in p.pl3:
             ret += "\t<persPl3>" + f.value + "</persPl3>\n"
         ret += "</preposition>\n"
@@ -432,7 +437,7 @@ class PrinterNeid:
         f: Form
         for f in v.verbalNoun:
             ret += "\t<vn>" + self._clean4xml(f.value) + "</vn>\n"
-        f: Form
+
         for f in v.verbalAdjective:
             ret += "\t<va>" + self._clean4xml(f.value) + "</va>\n"
 
@@ -457,25 +462,24 @@ class PrinterNeid:
         mapPerson["pl3"] = VPPerson.Pl3
         mapPerson["auto"] = VPPerson.Auto
 
-        vp: VP = VP(v)
+        vp: VP = VP.from_verb(v)
 
-        tense: string
-        for tense in mapTense.Keys:
+        tense: str
+        mood: str
+        pers: str
+        for tense in mapTense:
             ret += "\t<" + tense + ">\n"
-            pers: string
-            for pers in mapPerson.Keys:
+            for pers in mapPerson:
                 ret += "\t\t<" + pers + ">\n"
                 form: Form
                 for form in vp.tenses[mapTense[tense]][VPShape.Declar][mapPerson[pers]][
                     VPPolarity.Pos
                 ]:
                     ret += "\t\t\t<pos>" + self._clean4xml(form.value) + "</pos>\n"
-                form: Form
                 for form in vp.tenses[mapTense[tense]][VPShape.Interrog][
                     mapPerson[pers]
                 ][VPPolarity.Pos]:
                     ret += "\t\t\t<quest>" + self._clean4xml(form.value) + "?</quest>\n"
-                form: Form
                 for form in vp.tenses[mapTense[tense]][VPShape.Declar][mapPerson[pers]][
                     VPPolarity.Neg
                 ]:
@@ -487,13 +491,10 @@ class PrinterNeid:
         mapMood["imper"] = VPMood.Imper
         mapMood["subj"] = VPMood.Subj
 
-        mood: string
-        for mood in mapMood.Keys:
+        for mood in mapMood:
             ret += "\t<" + mood + ">\n"
-            pers: string
-            for pers in mapPerson.Keys:
+            for pers in mapPerson:
                 ret += "\t\t<" + pers + ">\n"
-                form: Form
                 for form in vp.moods[mapMood[mood]][mapPerson[pers]][VPPolarity.Pos]:
                     ret += (
                         "\t\t\t<pos>"
@@ -501,7 +502,7 @@ class PrinterNeid:
                         + ("!" if mapMood[mood] == VPMood.Imper else "")
                         + "</pos>\n"
                     )
-                form: Form
+
                 for form in vp.moods[mapMood[mood]][mapPerson[pers]][VPPolarity.Neg]:
                     ret += (
                         "\t\t\t<neg>"
@@ -534,18 +535,18 @@ class PrinterNeid:
         f: Form
         for f in p.full:
             ret += "\t<full>" + f.value + "</full>\n"
-        f: Form
+
         for f in p.apos:
             ret += "\t<apos>" + f.value + "</apos>\n"
         ret += "</possessive>\n"
         ret += "</Lemma>"
         return ret
 
-    def clean4xml(self, text: str) -> str:
+    def _clean4xml(self, text: str) -> str:
         ret: str = text
-        ret = ret.Replace("&", "&amp;")
-        ret = ret.Replace('"', "&quot;")
-        ret = ret.Replace("'", "&apos;")
-        ret = ret.Replace("<", "&lt;")
-        ret = ret.Replace(">", "&gt;")
+        ret = ret.replace("&", "&amp;")
+        ret = ret.replace('"', "&quot;")
+        ret = ret.replace("'", "&apos;")
+        ret = ret.replace("<", "&lt;")
+        ret = ret.replace(">", "&gt;")
         return ret
