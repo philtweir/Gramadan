@@ -2,7 +2,7 @@
 
 _With thanks to [michmech (Michal Měchura)](https://github.com/michmech/)!_
 
-A pure Python conversion of michmech's [Gramadán](https://github.com/michmech/Gramadan).
+*[UNOFFICIAL]* A pure Python conversion of michmech's [Gramadán](https://github.com/michmech/Gramadan).
 
 Note that, at present, the Python is _not_ idiomatic. It is intentionally kept similar to
 the original C#, although primarily in paradigm. The code here is extensively typed,

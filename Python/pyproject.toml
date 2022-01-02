@@ -2,7 +2,7 @@
 name = "gramadan-py"
 version = "0.1.0"
 description = "Pure Python implementation of michmech's C# Gramadán utility for manipulating the Irish National Morphology Database"
-authors = ["Michal Měchura <mech@lexiconista.com>", "Phil Weir (Python conversion) <phil.t.weir@gmail.com>"]
+authors = ["Phil Weir (Python conversion Michal Měchura's work) <phil.t.weir@gmail.com>"]
 license = "MIT"
 packages = [
     { include = "gramadan" }
