@@ -37,7 +37,7 @@ class PluralInfo:
 
 # Plural class LgC: weak, plural formed by slenderization.
 class PluralInfoLgC(PluralInfo):
-    def __init__(self, bayse: str, slenderizationTarget: str = ""):
+    def __init__(self, bayse: str, slenderizationTarget: str = "", v2: bool = False):
         super().__init__(strength=Strength.Weak)
 
         # generate the genitive:
@@ -52,17 +52,17 @@ class PluralInfoLgC(PluralInfo):
         form = bayse
         form = re.sub("ch$", "gh", form)
         # eg. bacach > bacaigh
-        form = Opers.SlenderizeWithTarget(form, slenderizationTarget)
+        form = Opers.SlenderizeWithTarget(form, slenderizationTarget, v2=v2)
         self.nominative.append(Form(form))
 
 
 # Plural class LgE: weak, plural formed by suffix "-e".
 class PluralInfoLgE(PluralInfo):
-    def __init__(self, bayse: str, slenderizationTarget: str = ""):
+    def __init__(self, bayse: str, slenderizationTarget: str = "", v2: bool = False):
         super().__init__(strength=Strength.Weak)
 
         form: str = bayse
-        form = Opers.SlenderizeWithTarget(form, slenderizationTarget) + "e"
+        form = Opers.SlenderizeWithTarget(form, slenderizationTarget, v2=v2) + "e"
 
         self.nominative.append(Form(form))
         self.genitive.append(Form(Opers.Broaden(bayse)))

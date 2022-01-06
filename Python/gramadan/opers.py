@@ -5,6 +5,23 @@ from .features import Mutation
 
 class Opers:
     @staticmethod
+    def PolysyllabicV2(text: str) -> bool:
+        check = ("["
+            + Opers.Cosonants
+            + "]+["
+            + Opers.Vowels
+            + "]+["
+            + Opers.Cosonants
+            + "]+")
+        # PTW: Experimental
+        if Opers.EndsVowel(text):
+            check = f"{check}[{Opers.Vowels}]$"
+        else:
+            check = f"[{Opers.Vowels}]{check}$"
+
+        return re.search(check, text) is not None
+
+    @staticmethod
     def Demutate(text: str) -> str:
         pattern: str
         pattern = "^[bB][hH]([fF].*)$"
@@ -317,16 +334,23 @@ class Opers:
     # ends in a broad vowel, then it changes this vowel cluster such that it ends in a slender vowel now.
     # Note: a base that's already slender passes through unchanged.
     @staticmethod
-    def Slenderize(bayse: str) -> str:
+    def Slenderize(bayse: str, v2: bool = False, with_ei_v2: bool = False) -> str:
         ret: str = bayse
 
         sources: Sequence[str] = ("ea", "éa", "ia", "ío", "io", "iu", "ae")
-        targets: Sequence[str] = ("i", "éi", "éi", "í", "i", "i", "aei")
+        targets: Sequence[str] = ("ei" if v2 and with_ei_v2 else "i", "éi", "éi", "í", "i", "i", "aei")
         match: Optional[re.Match]
         for source, target in zip(sources, targets):
+            infix = Opers.Cosonants
+            if v2:
+                # This seems to fix matching for
+                # first declension nouns that end in e.g. uíomh,
+                # such as forms of suíomh, cosnaíoch, claíomh, Haváíoch, diúlfaíoch, eachraíos, cómhaíomh, fuíoll,
+                # Craíoch, maíomh, Traíoch, Molacaíoch, buíoc...
+                infix += Opers.VowelsBroad
             match = re.search(
                 "^(.*["
-                + Opers.Cosonants
+                + infix
                 + "])?"
                 + source
                 + "(["
@@ -335,7 +359,8 @@ class Opers:
                 bayse,
             )
             if match:
-                ret = match.group(1) + target + match.group(2)
+                g1 = match.group(1) or ''
+                ret = g1 + target + match.group(2)
                 return ret
 
         # The generic case: insert "i" at the end of the vowel cluster:
@@ -343,7 +368,8 @@ class Opers:
             "^(.*[" + Opers.VowelsBroad + "])([" + Opers.Cosonants + "]+)$", bayse
         )
         if match:
-            ret = match.group(1) + "i" + match.group(2)
+            g1 = match.group(1) or ''
+            ret = g1 + "i" + match.group(2)
 
         return ret
 
@@ -352,10 +378,10 @@ class Opers:
     # Note: if the target does not end in a slender vowel, then regular slenderization is attempted instead.
     # Note: a base that's already attenuated passes through unchanged.
     @staticmethod
-    def SlenderizeWithTarget(bayse: str, target: str) -> str:
+    def SlenderizeWithTarget(bayse: str, target: str, v2: bool = False, with_ei_v2: bool = False) -> str:
         ret: str = bayse
         if not re.search("[" + Opers.VowelsSlender + "]$", target):
-            ret = Opers.Slenderize(bayse)
+            ret = Opers.Slenderize(bayse, v2=v2, with_ei_v2=with_ei_v2)
             # attempt regular slenderization instead
         else:
             match: Optional[re.Match] = re.search(
@@ -369,17 +395,23 @@ class Opers:
                 bayse,
             )
             if match:
-                ret = match.group(1) + target + match.group(2)
+                g1 = match.group(1) or ''
+                ret = g1 + target + match.group(2)
         return ret
 
     # Performs regular broadening: if the base ends in a consonant, and if the vowel cluster immediately before this consonant
     # ends in a slender vowel, then it changes this vowel cluster such that it ends in a broad vowel now.
     # Note: a base that's already broad passes through unchanged.
     @staticmethod
-    def Broaden(bayse: str) -> str:
+    def Broaden(bayse: str, with_io_v2: bool = False) -> str:
         ret: str = bayse
 
         sources: Sequence[str] = ("ói", "ei", "éi", "i", "aí", "í", "ui", "io")
+        if not with_io_v2:
+            # PTW: the final entry looks out of place, and fails for siocair, 4thD gen.
+            # so this makes it a special request - for nouns, it seems to only appear
+            # in 3rdD, e.g. crios, riocht
+            sources = sources[:-1]
         targets: Sequence[str] = ("ó", "ea", "éa", "ea", "aío", "ío", "o", "ea")
         match: Optional[re.Match]
         for source, target in zip(sources, targets):
@@ -394,7 +426,8 @@ class Opers:
                 bayse,
             )
             if match:
-                ret = match.group(1) + target + match.group(2)
+                g1 = match.group(1) or ''
+                ret = g1 + target + match.group(2)
                 return ret
 
         # The generic case: remove "i" from the end of the vowel cluster:
@@ -409,10 +442,10 @@ class Opers:
     # Note: if the target does not end in a broad vowel, then regular broadening is attempted instead.
     # Note: a base that's already broad passes through unchanged.
     @staticmethod
-    def BroadenWithTarget(bayse: str, target: str) -> str:
+    def BroadenWithTarget(bayse: str, target: str, with_io_v2: bool = False) -> str:
         ret: str = bayse
         if not re.search("[" + Opers.VowelsBroad + "]$", target):
-            ret = Opers.Broaden(bayse)
+            ret = Opers.Broaden(bayse, with_io_v2=with_io_v2)
             # attempt regular broadening instead
         else:
             match: Optional[re.Match] = re.search(
@@ -457,7 +490,7 @@ class Opers:
     # Performs syncope by removing the final vowel cluster,
     # then unduplicates and devoices the consonant cluster at the end.
     @staticmethod
-    def Syncope(bayse: str) -> str:
+    def Syncope(bayse: str, v2: bool = False) -> str:
         ret: str = bayse
 
         match: Optional[re.Match] = re.search(
@@ -471,7 +504,21 @@ class Opers:
             bayse,
         )
         if match:
-            ret = Opers.Devoice(Opers.Unduplicate(match.group(1) + match.group(2)))
+            g1 = match.group(1) or ''
+            ret = Opers.Devoice(Opers.Unduplicate(g1 + match.group(2)))
+            if v2 and any(pair in ret for pair in ('ln', 'dl', 'nl', 'dn', 'nd')):
+                # PTW: thanks to http://www.nualeargais.ie/gnag/palat.htm for codladh
+                if ret in ('codladh', 'caibidl'):
+                    return ret
+                go = True
+                # PTW: Ensure we only check actually modified characters
+                prefix = [b for b, r in zip(bayse, ret) if go and (b == r or (go := False))]
+                suffix = ret[len(prefix) - 2:]
+                # PTW: I think we need to confirm the final unsyncopated characters aren't
+                # an l/n/d pair before modifying below, as e.g. coinneal->coinnle not coinlle
+                suffix = re.sub("([^lnd])(ln|dl|nl)", r"\1ll", suffix)
+                suffix = re.sub("([^lnd])(dn|nd)", "nn", suffix)
+                ret = ''.join(prefix[:-2]) + suffix
 
         return ret
 
