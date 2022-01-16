@@ -15,7 +15,7 @@ class Opers:
             + "]+")
         # PTW: Experimental
         if Opers.EndsVowel(text):
-            check = f"{check}[{Opers.Vowels}]$"
+            check = f"{check}[{Opers.Vowels}]*$"
         else:
             check = f"[{Opers.Vowels}]{check}$"
 
