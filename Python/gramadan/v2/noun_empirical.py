@@ -11,19 +11,10 @@ from gramadan.v2.database import Database
 from gramadan.v2.semantic_groups import FAMILY
 from gramadan.v2.other_groups import POSSIBLE_LOANWORDS_GENITIVELESS, BUNAMO_ONLY_GENITIVELESS
 
-class DeclensionInconsistentError(Exception):
-    def __init__(self, msg, dec, dec_exp):
-        super().__init__(msg)
-        self.dec = dec
-        self.dec_exp = dec_exp
+from gramadan.v2.noun import DeclensionInconsistentError, FormsMissingException, FormsAmbiguousException, EmpiricalNounDeclensionGuesser, NounDeclensionGuesser
 
-class FormsMissingException(Exception):
-    pass
 
-class FormsAmbiguousException(Exception):
-    pass
-
-class NounDeclensionGuesser:
+class EmpiricalNounDeclensionGuesser(NounDeclensionGuesser):
     MULTIPLE_WORDS = {
         'sail': ((5, 'saileach'), (2, 'saile')),
         'cian': ((1, 'cian'), (2, 'céine'))
@@ -162,23 +153,327 @@ class NounDeclensionGuesser:
             'araí': (4, 'araíon'),
             'coinnealbhá': (4, 'coinnealbháite'), # strange as other 4Fem compounds with bhá are reg.
 
+            # Fifth
+            'fearchú': (5, 'fearchon'),
+            'árchú': (5, 'árchon'),
+            'onchú': (5, 'onchon'),
+            'sail': (5, 'saileach'), # cf. sail - also fem, dec.2
+            'caora': (5, 'caorach'), # irreg. because not -n/l/r
+            'cathaoir': (5, 'cathaoireach'),
+            'fóir': (5, 'fóireach'),
+            'cara': (5, 'carad'),
             'namhaid': (5, 'namhad'),
             'bráid': (5, 'brád'),
             'Nollaig': (5, 'Nollag'),
     }
 
     IRREGULAR_INCLUSION = {
-            'aibítir': 2,
-            'cosmhuintir': 2,
-            'deoir': 2,
-            'diathair': 2,
-            'gabhair': 4,
-            'muintir': 2,
-            'mórphearsa': 4,
-            'spairn': 2,
+            'bocht': 1, # otherwise 4
+            'nocht': 1, # otherwise 4
+
+            'ab': 3, # otherwise 1
+            'aimhleas': 3, # otherwise 1
+            'ainbhios': 3, # otherwise 1
+            'altram': 3, # otherwise 1
+            'anam': 3, # otherwise 1
+            'athdhreas': 3, # otherwise 1
+            'bang': 3, # otherwise 1
+            'beart': 3, # otherwise 1
+            'bior': 3, # otherwise 1
+            'brath': 1, # otherwise 3
+            'bum': 3, # otherwise 1
+            'cac': 3, # otherwise 1
+            'cam': 1, # otherwise 3
+            'cead': 3, # otherwise 1
+            'cleas': 1, # otherwise 3
+            'cneas': 1, # otherwise 3
+            'coincheap': 3, # otherwise 1
+            'coinsias': 3, # otherwise 1
+            'comhfhios': 3, # otherwise 1
+            'creat': 3, # otherwise 1
+            'crinnghréas': 3, # otherwise 1
+            'daol': 1, # otherwise 3
+            'deann': 3, # otherwise 1
+            'deargadaol': 1, # otherwise 3
+            'deimheas': 1, # otherwise 3
+            'dlúth': 1, # otherwise 3
+            'dreach': 3, # otherwise 1
+            'driuch': 3, # otherwise 1
+            'drochshaol': 1, # otherwise 3
+            'dúshnámh': 3, # otherwise 1
+            'feadh': 3, # otherwise 1
+            'feart': 3, # otherwise 1
+            'flas': 3, # otherwise 1
+            'flosc': 3, # otherwise 1
+            'forás': 1, # otherwise 3
+            'fríos': 3, # otherwise 1
+            'fág': 3, # otherwise 1
+            'fíon': 3, # otherwise 1
+            'geaf': 3, # otherwise 1
+            'gean': 3, # otherwise 1
+            'geábh': 3, # otherwise 1
+            'gleann': 3, # otherwise 1
+            'gliúc': 3, # otherwise 1
+            'gléas': 1, # otherwise 3
+            'gnáth': 1, # otherwise 3
+            'gnéas': 1, # otherwise 3
+            'gram': 1, # otherwise 3
+            'gus': 3, # otherwise 1
+            'laom': 3, # otherwise 1
+            'leithcheal': 3, # otherwise 1
+            'lionn': 3, # otherwise 1
+            'loch': 3, # otherwise 1
+            'láth': 1, # otherwise 3
+            'léas': 1, # otherwise 3
+            'lúth': 1, # otherwise 3
+            'mant': 3, # otherwise 1
+            'modh': 3, # otherwise 1
+            'mogh': 3, # otherwise 1
+            'muirdhreach': 3, # otherwise 1
+            'mám': 3, # otherwise 1
+            'oigheareas': 3, # otherwise 1
+            'ollmhaitheas': 3, # otherwise 1
+            'prás': 1, # otherwise 3
+            'rang': 3, # otherwise 1
+            'riast': 3, # otherwise 1
+            'rámh': 3, # otherwise 1
+            'réad': 3, # otherwise 1
+            'ríomh': 3, # otherwise 1
+            'scol': 3, # otherwise 1
+            'seal': 3, # otherwise 1
+            'siad': 3, # otherwise 1
+            'sioc': 3, # otherwise 1
+            'slad': 3, # otherwise 1
+            'smealt': 3, # otherwise 1
+            'smior': 3, # otherwise 1
+            'sos': 3, # otherwise 1
+            'spreang': 3, # otherwise 1
+            'stoth': 1, # otherwise 3
+            'suanlios': 3, # otherwise 1
+            'taom': 3, # otherwise 1
+            'tart': 3, # otherwise 1
+            'tathant': 3, # otherwise 1
+            'tost': 3, # otherwise 1
+            'treall': 3, # otherwise 1
+            'troch': 3, # otherwise 1
+            'trunc': 3, # otherwise 1
+            'tréad': 3, # otherwise 1
+            'turghleann': 3, # otherwise 1
+            'tírdhreach': 3, # otherwise 1
+            'uaillbhreas': 3, # otherwise 1
+            'urlios': 3, # otherwise 1
+            'víol': 3, # otherwise 1
+            'áineas': 3, # otherwise 1
+            'éad': 3, # otherwise 1
+            'éag': 3, # otherwise 1
+            'údarás': 1, # otherwise 3
+
             'straidhn': 2,
             'tiúin': 2,
+            'spairn': 2,
+            'diathair': 2,
+            'deoir': 2,
             'éitir': 2,
+            'cosmhuintir': 2,
+            'muintir': 2,
+            'aibítir': 2,
+            'vacsaín': 2,
+            'dín': 2,
+            'falacail': 2, # otherwise 4
+            'trucail': 2, # otherwise 4
+            'fail': 2, # otherwise 4
+            'aragail': 2, # otherwise 4
+            'máchail': 2, # otherwise 4
+            'diail': 2, # otherwise 4
+            'gunail': 2, # otherwise 4
+            'copail': 2, # otherwise 4
+            'gasail': 2, # otherwise 4
+            'hiodrocsail': 2, # otherwise 4
+            'stail': 2, # otherwise 4
+            'uail': 2, # otherwise 4
+            'luail': 2, # otherwise 4
+            'cáil': 2, # otherwise 4
+            'scáil': 2, # otherwise 4
+            'léarscáil': 2, # otherwise 4
+            'sracléarscáil': 2, # otherwise 4
+            'geargáil': 2, # otherwise 4
+            'páil': 2, # otherwise 4
+            'sáil': 2, # otherwise 4
+            'miúil': 2, # otherwise 4
+            'clibirt': 2, # otherwise 4
+            'beirt': 2, # otherwise 4
+            'ceirt': 2, # otherwise 4
+            'caismirt': 2, # otherwise 4
+            'contúirt': 2, # otherwise 4
+
+            'bail': 2, # otherwise 3
+            'scil': 2, # otherwise 3
+            'beicireil': 2, # otherwise 3
+            'stil': 2, # otherwise 3
+            'cuil': 2, # otherwise 3
+            'carrchuil': 2, # otherwise 3
+            'urchuil': 2, # otherwise 3
+            'druil': 2, # otherwise 3
+            'hipearbóil': 2, # otherwise 3
+            'líonóil': 2, # otherwise 3
+            'cúpóil': 2, # otherwise 3
+            'seachtain': 2, # otherwise 3
+            'balcóin': 2, # otherwise 3
+            'sionfóin': 2, # otherwise 3
+            'sclóin': 2, # otherwise 3
+            'armóin': 2, # otherwise 3
+            'dlútharmóin': 2, # otherwise 3
+            'hearóin': 2, # otherwise 3
+            'íoróin': 2, # otherwise 3
+            'gnáthscair': 2, # otherwise 3
+            'teanchair': 2, # otherwise 3
+            'catagóir': 2, # otherwise 3
+            'glóir': 2, # otherwise 3
+            'póir': 2, # otherwise 3
+            'ruíleas': 2, # otherwise 3
+
+            'íobairt': 3, # otherwise 4
+            'forbairt': 3, # otherwise 4
+            'athfhorbairt': 3, # otherwise 4
+            'treascairt': 3, # otherwise 4
+            'coscairt': 3, # otherwise 4
+            'diúscairt': 3, # otherwise 4
+            'labhairt': 3, # otherwise 4
+            'tabhairt': 3, # otherwise 4
+            'cnuchairt': 3, # otherwise 4
+            'faghairt': 3, # otherwise 4
+            'íospairt': 3, # otherwise 4
+            'buairt': 3, # otherwise 4
+
+            'ban-ab': 3, # otherwise 2
+            'máthairab': 3, # otherwise 2
+            'Cáisc': 3, # otherwise 2
+            'scread': 3, # otherwise 2
+            'troid': 3, # otherwise 2
+            'cuid': 3, # otherwise 2
+            'cuaird': 3, # otherwise 2
+            'feag': 3, # otherwise 2
+            'eang': 3, # otherwise 2
+            'luaith': 3, # otherwise 2
+            'cáith': 3, # otherwise 2
+            'both': 3, # otherwise 2
+            'scoth': 3, # otherwise 2
+            'fíorscoth': 3, # otherwise 2
+            'feoil': 3, # otherwise 2
+            'toil': 3, # otherwise 2
+            'béicíl': 3, # otherwise 2
+            'cáithíl': 3, # otherwise 2
+            'búiríl': 3, # otherwise 2
+            'seitríl': 3, # otherwise 2
+            'smaoisíl': 3, # otherwise 2
+            'grianbhladhm': 3, # otherwise 2
+            'uaim': 3, # otherwise 2
+            'úim': 3, # otherwise 2
+            'athsheinm': 3, # otherwise 2
+            'seinm': 3, # otherwise 2
+            'dúchan': 3, # otherwise 2
+            'feadhain': 3, # otherwise 2
+            'Samhain': 3, # otherwise 2
+            'líomhain': 3, # otherwise 2
+            'deoin': 3, # otherwise 2
+            'goin': 3, # otherwise 2
+            'síocháin': 3, # otherwise 2
+            'eadráin': 3, # otherwise 2
+            'táin': 3, # otherwise 2
+            'cnuaisciúin': 3, # otherwise 2
+            'fíniúin': 3, # otherwise 2
+            'ríon': 3, # otherwise 2
+            'banríon': 3, # otherwise 2
+            'cearn': 3, # otherwise 2
+            'starr': 3, # otherwise 2
+            'taispeáint': 3, # otherwise 2
+            'iomáint': 3, # otherwise 2
+            'tiomáint': 3, # otherwise 2
+
+            'mórphearsa': 4,
+            'gabhair': 4,
+            'feac': 4,
+            'cadhc': 4,
+            'faic': 4,
+            'feic': 4,
+            'sonc': 4,
+            'bunc': 4,
+            'hurlamaboc': 4,
+            'trioc': 4,
+            'stad': 4,
+            'leathstad': 4,
+            'grianstad': 4,
+            'lánstad': 4,
+            'idirstad': 4,
+            'leagáid': 4,
+            'iarmhéid': 4,
+            'uasmhéid': 4,
+            'bréid': 4,
+            'triuf': 4,
+            'dallamullóg': 4,
+            'tiubh': 4,
+            'neach': 4,
+            'trach': 4,
+            'bláthchuach': 4,
+            'imchuach': 4,
+            'cách': 4,
+            'fáidh': 4,
+            'príomháidh': 4,
+            'aodh': 4,
+            'anraith': 4,
+            'líonrith': 4,
+            'clíth': 4,
+            'ceal': 4,
+            'meal': 4,
+            'Iúil': 4,
+            'pléiseam': 4,
+            'seachain': 4,
+            'cliamhain': 4,
+            'banchliamhain': 4,
+            'dóthain': 4,
+            'Céadaoin': 4,
+            'Déardaoin': 4,
+            'lachín': 4,
+            'beainín': 4,
+            'óinsín': 4,
+            'bóín': 4,
+            'lao': 4,
+            'glao': 4,
+            'trup': 4,
+            'seáp': 4,
+            'lear': 4,
+            'sciar': 4,
+            'riar': 4,
+            'paor': 4,
+            'gearr': 4,
+            'seacht': 4,
+            'ocht': 4,
+            'ceant': 4,
+
+            'leaca': 5,
+            'ionga': 5,
+            'Lemma': 5,
+            'céimseata': 5,
+            'leite': 5,
+            'cabhail': 5,
+            'traein': 5,
+            'cáin': 5,
+            'mótarcháin': 5,
+            'cráin': 5,
+            'coróin': 5,
+            'abhainn': 5,
+            'siocair': 5,
+            'carcair': 5,
+            'dair': 5,
+            'corcdhair': 5,
+            'láthair': 5,
+            'lasair': 5,
+            'loinnir': 5,
+            'láir': 5,
+            'céir': 5,
+            'fíor': 5,
+            'deachú': 5,
+            'cian': 5,
     }
 
 
@@ -320,7 +615,7 @@ class NounDeclensionGuesser:
                 # if irregular_inclusion == dec:
                 #     checks[dec](focal) # So we can get genitive
                 return dec
-        return 5
+        return 3
 
     # The below are private as to save
     # duplication, they assume they have been run
@@ -332,9 +627,30 @@ class NounDeclensionGuesser:
 
         irregularly_palatalized: dict[str, str] = {}
 
-        if focal.sgNom[0].value == focal.sgGen[0].value:
+        if lemma in POSSIBLE_LOANWORDS_GENITIVELESS + BUNAMO_ONLY_GENITIVELESS:
             return True
 
+        # Should we even be here?
+        if (
+                lemma.endswith('ín') and gender is Gender.Masc
+
+                or
+
+                gender is Gender.Masc and
+                (
+                    (
+                        {lemma[-i:] for i in range(1, 4)} & {'ín', 'aí', 'ú', 'nm', 'iam', 'cs', 'ts', 'ns', 'eo'}
+                        or re.search('[^óoé]ir$', lemma)
+                    )
+                    and not re.search('[eú]ir', lemma)
+                    and lemma not in FAMILY # Masc family are usu. 5th
+                )
+
+                or
+
+                {lemma[-i:] for i in range(1, 4)} & {'a', 'e', 'í', 'le', 'ne', 'é', 'aoi', 'ó', 'á'}
+            ):
+            return True
 
         # This doesn't seem to be clearly documented in the
         # usual places, but 49 nouns ending in ú in BuNaMo
@@ -342,20 +658,20 @@ class NounDeclensionGuesser:
         # different from nominative. This compares to 105 that
         # end in ú, are marked 4th and gen=nom. All of both sets
         # are masculine, in contrast to 2nd decl.
-        if gender is Gender.Masc:
-            palatalized = SingularInfoE(
-                lemma,
-                focal.getGender(),
-                syncope=True,
-                doubleDative=False,
-                slenderizationTarget=(
-                    irregularly_palatalized.get(lemma, "")
-                ),
-                v2=True
-            )
+        #if gender is Gender.Masc:
+        #    palatalized = SingularInfoE(
+        #        lemma,
+        #        focal.getGender(),
+        #        syncope=True,
+        #        doubleDative=False,
+        #        slenderizationTarget=(
+        #            irregularly_palatalized.get(lemma, "")
+        #        ),
+        #        v2=True
+        #    )
 
-            if palatalized.genitive[0].value == focal.sgGen[0].value:
-                return True
+        #    if palatalized.genitive[0].value == focal.sgGen[0].value:
+        #        return True
 
         if focal.declension and focal.declension == 4:
             raise DeclensionInconsistentError(
@@ -392,57 +708,47 @@ class NounDeclensionGuesser:
 
         if gender == Gender.Masc and lemma != 'im':
             return False
-
-        palatalized = SingularInfoE(
-            lemma,
-            focal.getGender(),
-            syncope=False,
-            doubleDative=False,
-            slenderizationTarget=(
-                "ei" if lemma in polysyllabic_ei else ""
-            ),
-            v2=True,
-            with_monosyllabic_ei_v2=lemma not in monosyllabic_i
-        )
-
-        if palatalized.genitive[0].value == focal.sgGen[0].value:
-            return True
-
-        # This could be at the top, but the farther we can go
-        # without gender, the better our guessing without it.
-        palatalized_c = SingularInfoC(
-            focal.sgNom[0].value,
-            focal.getGender(),
-            slenderizationTarget=(
-                "ei" if lemma in polysyllabic_ei else ""
-            ),
-            v2=True
-        )
-
-        if palatalized_c.genitive[0].value == focal.sgGen[0].value:
-            return True
-
-        palatalized_sync = SingularInfoE(
-            focal.sgNom[0].value,
-            focal.getGender(),
-            syncope=True,
-            doubleDative=False,
-            slenderizationTarget=(
-                "ei" if lemma in polysyllabic_ei else ""
-            ),
-            v2=True,
-            with_monosyllabic_ei_v2=lemma not in monosyllabic_i
-        )
-
-        if palatalized_sync.genitive[0].value == focal.sgGen[0].value:
-            return True
-
-        if focal.declension and focal.declension == 2:
-            raise DeclensionInconsistentError(
-                f'Declension 2 not determined as expected for {lemma}! Expected {focal.declension}',
-                2, focal.declension
-            )
-        return False
+        if mono:
+            if not Opers.IsSlender(lemma):
+                return True
+            ends = [
+                '[^eoéú]il',
+                'ói[nr]',
+            ]
+            if any(map(lambda end: re.search(f'{end}$', lemma), ends)):
+                return False
+        else:
+            ends = [
+                'ail',
+                'ain',
+                'úil',
+                'is?[msrtgbcdnh]+il',
+                '[pb]h?[eé]il',
+                'scoil',
+            ]
+            if any(map(lambda end: re.search(f'{end}$', lemma), ends)):
+                return True
+            #if not Opers.IsSlender(lemma):
+            #    return True
+            ends = [
+                'il',
+                'aíl',
+                'ói[nr]',
+                'c?ht?ain',
+                '[oáa]chan',
+                'bh?liain',
+                'ch?uid',
+                'ch?air',
+                'e[aá]s',
+                '[bc]h?ail',
+                'laim',
+                #'ain',
+                f'^[{Opers.Cosonants}]*[aoáóuú]+[ií]n',
+                #f'[{Opers.Cosonants}]*[eéií][aoáóuú]+[^{Opers.Cosonants}]*n',
+            ]
+            if any(map(lambda end: re.search(f'{end}$', lemma), ends)):
+                return False
+        return True
 
     def _is_third(self, focal: Noun):
         lemma = focal.getLemma()
@@ -485,18 +791,74 @@ class NounDeclensionGuesser:
             with_syncopated_ai_v2=lemma not in unsyncopated_exceptions,
         )
 
-        if depalatalized.genitive[0].value == focal.sgGen[0].value:
+        if lemma in unsyncopated_exceptions:
             return True
 
-        if focal.declension and focal.declension == 3:
-            raise DeclensionInconsistentError(
-                f'Declension 3 not determined as expected for {lemma}! Expected {focal.declension}',
-                3, focal.declension
-            )
+        exception_endings = (
+            '[^g][aá]irt$',
+            'oirt$',
+            '[ds]h?úil$',
+            'bh?ail$',
+            'fh?iacail$',
+            '[bc]h?[aú]irt$',
+            #'h?[aú]int$',
+            'ol$',
+            '[^e]oil$',
+            '[aá]ch?an$',
+            'an$',
+            'aol$',
+            '[^úc]int$',
+            'ean$',
+            'us$',
+        )
+
+        if any(map(lambda end: re.search(end, lemma), exception_endings)):
+            return False
+
+        endings = (
+            'áil',
+            'úil',
+            'ail',
+            'úint',
+            'cht',
+            'irt',
+            '[óa]in',
+            'áint',
+            'aint',
+            'cht',
+            'int',
+            'chtain',
+            'an',
+        )
+
+        if any(map(lambda end: lemma.endswith(end), endings)):
+            return True
+
+        endings = (
+            'int$',
+            'éir$',
+            'ain$',
+            'us$',
+            'eir$',
+            'eoir$',
+            'óir$',
+            'úir$',
+            'cht$',
+        )
+
+        if any(map(lambda end: re.search(end, lemma), endings)) and gender == Gender.Masc:
+            return True
+
+        #if focal.declension and focal.declension == 3:
+        #    raise DeclensionInconsistentError(
+        #        f'Declension 3 not determined as expected for {lemma}! Expected {focal.declension}',
+        #        3, focal.declension
+        #    )
         return False
 
     def _is_first(self, focal: Noun):
         lemma = focal.getLemma()
+        gender = focal.getGender()
 
         irregularly_palatalized = {
             'mac': 'i',
@@ -535,8 +897,57 @@ class NounDeclensionGuesser:
             # are handled in SingularInfoC).
         )
 
-        if palatalized.genitive[0].value == focal.sgGen[0].value:
+        # if (
+        #         lemma.endswith('ín') and gender is Gender.Masc
+
+        #         or
+
+        #         gender is Gender.Masc and
+        #         (
+        #             (
+        #                 {lemma[-i:] for i in range(1, 4)} & {'ín', 'aí', 'ú', 'nm', 'iam', 'cs', 'ts', 'ns', 'eo'}
+        #                 or re.search('[^óoé]ir$', lemma)
+        #             )
+        #             and not re.search('[eú]ir', lemma)
+        #             and lemma not in FAMILY # Masc family are usu. 5th
+        #         )
+
+        #         or
+
+        #         {lemma[-i:] for i in range(1, 4)} & {'a', 'e', 'í', 'le', 'ne', 'é', 'aoi', 'ó', 'á'}
+        #     ):
+        #         return False
+        ends = [
+            'th',
+            'lus',
+            'luach',
+            'mheas',
+            'rás',
+            'bhr?éas',
+            'd.*[ou]l',
+            'ch?r?[ií]os',
+            'rud',
+            'íoc',
+        ]
+        if any(map(lambda end: re.search(f'{end}$', lemma), ends)):
+            return False
+
+        ends = [
+            'ios',
+            'am',
+            'iol',
+            '[eé]as',
+        ]
+        if any(map(lambda end: re.search(f'{end}$', lemma), ends)) and not Opers.PolysyllabicV2(lemma):
+            return False
+
+        if lemma[:2] == 'sn' and not Opers.PolysyllabicV2(lemma):
+            return False
+
+        if re.search("([" + Opers.VowelsBroad + "]|ae)[" + Opers.Cosonants + "]*$", lemma) and gender == Gender.Masc:
             return True
+        #if palatalized.genitive[0].value == focal.sgGen[0].value:
+        #    return True
 
         if focal.declension and focal.declension == 1:
             raise DeclensionInconsistentError(
@@ -549,6 +960,9 @@ class NounDeclensionGuesser:
         lemma = focal.getLemma()
         gender = focal.getGender()
         depalatalized = SingularInfoL(lemma, gender, v2=True)
+
+        if gender == Gender.Masc:
+            return False
 
         if lemma.endswith('ceathrú') or lemma.endswith('cheathrú'):
             return True
@@ -590,11 +1004,11 @@ class NounDeclensionGuesser:
                 #if modified_n.genitive[0].value == focal.sgGen[0].value:
                 return True
         # Doesn't seem necessary...
-        elif gender == Gender.Masc and focal.sgNom[0].value[-1] in Opers.Vowels:
-            modified_d = SingularInfoD(lemma, gender)
+        #elif gender == Gender.Masc and focal.sgNom[0].value[-1] in Opers.Vowels:
+        #    modified_d = SingularInfoD(lemma, gender)
 
-            if modified_d.genitive[0].value == focal.sgGen[0].value:
-                return True
+        #    if modified_d.genitive[0].value == focal.sgGen[0].value:
+        #        return True
 
         if focal.declension and focal.declension == 5:
             raise DeclensionInconsistentError(
@@ -603,15 +1017,8 @@ class NounDeclensionGuesser:
             )
         return False
 
-# Thanks to http://www.nualeargais.ie/foghlaim/nouns.php for the rules
-def _find_f4_nouns(database):
-    for noun in database.dictionary['noun'].values():
-        lemma = noun.getLemma()
-        if lemma[-1] in ('e', 'í') and noun.getGender() == Gender.Fem:
-            yield lemma
-
 if __name__ == "__main__":
-    guesser = NounDeclensionGuesser()
+    guesser = EmpiricalNounDeclensionGuesser()
     if len(sys.argv) > 1:
         path = sys.argv[1]
     else:
