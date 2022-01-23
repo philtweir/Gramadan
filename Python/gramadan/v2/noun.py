@@ -11,6 +11,9 @@ from gramadan.v2.database import Database
 from gramadan.v2.semantic_groups import FAMILY
 from gramadan.v2.other_groups import POSSIBLE_LOANWORDS_GENITIVELESS, BUNAMO_ONLY_GENITIVELESS
 
+def re_ends(lemma, ends):
+    return any(map(lambda end: re.search(f'{end}$', lemma), ends))
+
 class DeclensionInconsistentError(Exception):
     def __init__(self, msg, dec, dec_exp):
         super().__init__(msg)
@@ -307,20 +310,24 @@ class NounDeclensionGuesser:
             # of teach.
             return 1
 
-        checks = [lambda _: _,
-            self._is_first,
-            self._is_second,
-            self._is_third,
-            self._is_fourth,
-            self._is_fifth,
-        ]
-        for dec in range(5, 0, -1):
+        for n, check in enumerate(self.checks):
+            dec = 5 - n
             irregular_inclusion = self.IRREGULAR_INCLUSION.get(lemma, None)
-            if irregular_inclusion == dec or (not irregular_inclusion and checks[dec](focal)):
+            if irregular_inclusion == dec or (not irregular_inclusion and check(focal)):
                 # if irregular_inclusion == dec:
                 #     checks[dec](focal) # So we can get genitive
                 return dec
         return 5
+
+    @property
+    def checks(self):
+        return [
+            self._is_fifth,
+            self._is_fourth,
+            self._is_third,
+            self._is_second,
+            self._is_first,
+        ]
 
     # The below are private as to save
     # duplication, they assume they have been run
@@ -602,93 +609,3 @@ class NounDeclensionGuesser:
                 5, focal.declension
             )
         return False
-
-# Thanks to http://www.nualeargais.ie/foghlaim/nouns.php for the rules
-def _find_f4_nouns(database):
-    for noun in database.dictionary['noun'].values():
-        lemma = noun.getLemma()
-        if lemma[-1] in ('e', 'í') and noun.getGender() == Gender.Fem:
-            yield lemma
-
-if __name__ == "__main__":
-    guesser = NounDeclensionGuesser()
-    if len(sys.argv) > 1:
-        path = sys.argv[1]
-    else:
-        path = os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, 'output', 'data')
-
-    dictionary = None
-    print_result = False
-    for n, arg in enumerate(sys.argv):
-        if arg == '--word':
-            lemma, gender, gen = sys.argv[n+1].split(',')
-            noun = Noun(
-                [FormSg(lemma, Gender(gender))],
-                [FormSg(gen, Gender(gender))],
-            )
-            dictionary = {
-                lemma: noun
-            }
-            print_result = True
-
-    if not dictionary:
-        database = Database(path)
-        database.load()
-        dictionary = database.dictionary.noun
-
-    errors = []
-    known = 0
-    unknown = []
-    for n, (lemma, noun) in enumerate(dictionary.items()):
-        try:
-            if noun.declension:
-                known += 1
-            dec = guesser.guess(noun)
-            if noun.declension:
-                if dec != noun.declension:
-                    raise DeclensionInconsistentError(
-                        f'Declension for {lemma}, expected {noun.declension}, got {dec}',
-                        dec,
-                        noun.declension
-                    )
-            else:
-                noun.declension = dec
-                if print_result and not dec:
-                    unknown.append(noun)
-        except FormsMissingException as e:
-            if '--debug' in sys.argv:
-                print('[', e, ']')
-        except DeclensionInconsistentError as e:
-            errors.append((noun, e))
-            if '--debug' in sys.argv:
-                print(e)
-
-    if len(errors) < 20 or '--all' in sys.argv:
-        import tabulate # type: ignore
-        table = [
-            {
-                'Lemma': noun.getLemma(),
-                'Gender': noun.getGender().value,
-                'Genitive': noun.sgGen[0].value if len(noun.sgGen) else '',
-                'Error': str(e)
-            }
-            for noun, e in errors
-        ]
-        print(tabulate.tabulate(table, headers='keys'))
-
-    if print_result:
-        import tabulate # type: ignore
-        table = [
-            {
-                'Lemma': lemma,
-                'Gender': noun.getGender().value,
-                'Genitive': noun.sgGen[0].value if len(noun.sgGen) else '',
-                'Declension': 'IRR.' if noun.declension == -1 else noun.declension
-            }
-            for lemma, noun in dictionary.items()
-        ]
-        print(tabulate.tabulate(table, headers='keys'))
-        if unknown:
-            print(f"{len(unknown)} could not be guessed: {', '.join([n.getLemma() for n in unknown])}")
-    if known:
-        print(f"Errors {len(errors)} in {known} known, {100 * (1 - len(errors) / known):.2f}% success")
