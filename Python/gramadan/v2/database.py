@@ -131,6 +131,8 @@ class Database:
                 self._dictionary[folder][word.getLemma().lower()] = word
         supplementary_dir = os.path.join(os.path.dirname(__file__), 'supplementary')
         for fl in os.listdir(supplementary_dir):
+            if not fl.endswith('.xml'):
+                continue
             xml = ET.parse(os.path.join(supplementary_dir, fl))
             root_node = xml.getroot()
             word = self._dictionary[root_node.tag][root_node.get('default')]
