@@ -1,0 +1,10 @@
+<preposition default="do" disambig="">
+  <sgArt default="don" />
+  <sgPoss3Masc default="dá" />
+  <sgPoss3Fem default="dá" />
+  <plPoss1 default="dár" />
+  <plPoss3 default="dá" />
+  <copularCons default="dar" />
+  <copularPresVowel default="darb" />
+  <copularPastVowel default="darbh" />
+</preposition>

@@ -1,0 +1,12 @@
+<preposition default="i" disambig="">
+  <sgArt default="sa" />
+  <sgArtVowel default="san" />
+  <sgPoss3Masc default="ina" />
+  <sgPoss3Fem default="ina" />
+  <plArt default="sna" />
+  <plPoss1 default="inár" />
+  <plPoss3 default="ina" />
+  <copularCons default="inar" />
+  <copularPresVowel default="inarb" />
+  <copularPastVowel default="inarbh" />
+</preposition>

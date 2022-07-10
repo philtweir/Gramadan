@@ -1,0 +1,10 @@
+<preposition default="ó" disambig="">
+  <sgArt default="ón" />
+  <sgPoss3Masc default="óna" />
+  <sgPoss3Fem default="óna" />
+  <plPoss1 default="ónár" />
+  <plPoss3 default="óna" />
+  <copularCons default="ónar" />
+  <copularPresVowel default="ónarb" />
+  <copularPastVowel default="ónarbh" />
+</preposition>

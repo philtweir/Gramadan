@@ -1,0 +1,9 @@
+<preposition default="le" disambig="">
+  <sgPoss3Masc default="lena" />
+  <sgPoss3Fem default="lena" />
+  <plPoss1 default="lenár" />
+  <plPoss3 default="lena" />
+  <copularCons default="lenar" />
+  <copularPresVowel default="lenarb" />
+  <copularPastVowel default="lenarbh" />
+</preposition>

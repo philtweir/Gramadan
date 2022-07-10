@@ -1,0 +1,10 @@
+<preposition default="trí" disambig="">
+  <sgArt default="tríd an" />
+  <sgPoss3Masc default="trína" />
+  <sgPoss3Fem default="trína" />
+  <plPoss1 default="trínár" />
+  <plPoss3 default="trína" />
+  <copularCons default="trínar" />
+  <copularPresVowel default="trínarb" />
+  <copularPastVowel default="trínarbh" />
+</preposition>

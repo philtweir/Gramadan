@@ -1,0 +1,10 @@
+<preposition default="faoi" disambig="">
+  <sgArt default="faoin" />
+  <sgPoss3Masc default="faoina" />
+  <sgPoss3Fem default="faoina" />
+  <plPoss1 default="faoinár" />
+  <plPoss3 default="faoina" />
+  <copularCons default="faoinar" />
+  <copularPresVowel default="faoinarb" />
+  <copularPastVowel default="faoinarbh" />
+</preposition>
