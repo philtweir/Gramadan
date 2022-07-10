@@ -8,6 +8,8 @@ from .opers import Opers
 from .possessive import Possessive
 from .adjective import Adjective
 
+NounType = Noun
+
 # A class for a noun phrase:
 class NP:
     disambig: str = ""
@@ -46,7 +48,7 @@ class NP:
         sgDatArtN: Optional[list[FormSg]],
         sgDatArtS: Optional[list[FormSg]],
         plNom: Optional[list[Form]],
-        plGen: Optional[list[Form]],
+        plGen: Optional[list[FormPlGen]],
         plDat: Optional[list[Form]],
         plNomArt: Optional[list[Form]],
         plGenArt: Optional[list[Form]],
@@ -88,7 +90,7 @@ class NP:
         self.plNom: list[Form] = []
         if plNom is not None:
             self.plNom = plNom
-        self.plGen: list[Form] = []
+        self.plGen: list[FormPlGen] = []
         if plGen is not None:
             self.plGen = plGen
         self.plDat: list[Form] = []  # head noun left unmutated
@@ -307,7 +309,7 @@ class NP:
 
     # Creates a noun phrase from a noun determined by a possessive pronoun:
     @classmethod
-    def create_from_possessive(cls, head: Noun, poss: Possessive) -> NP:
+    def create_from_possessive(cls, head: NounType, poss: Possessive) -> NP:
         np = cls.create_from_noun(head)
         np._makePossessive(poss)
         return np
@@ -315,7 +317,7 @@ class NP:
     # Creates a noun phrase from a noun modified by an adjective determined by a possessive pronoun:
     @classmethod
     def create_from_noun_adjective_possessive(
-        cls, head: Noun, mod: Adjective, poss: Possessive
+        cls, head: NounType, mod: Adjective, poss: Possessive
     ) -> NP:
         np = cls.create_from_noun_adjective(head, mod)
         np._makePossessive(poss)
@@ -323,7 +325,7 @@ class NP:
 
     # Creates a noun phrase from a noun:
     @classmethod
-    def create_from_noun(cls, head: Noun) -> NP:
+    def create_from_noun(cls, head: NounType) -> NP:
         isDefinite = head.isDefinite
         isImmutable = head.isImmutable
         # region singular-nominative
@@ -338,7 +340,7 @@ class NP:
         sgDatArtN: list[FormSg] = []
         sgDatArtS: list[FormSg] = []
         plNom: list[Form] = []
-        plGen: list[Form] = []
+        plGen: list[FormPlGen] = []
         plDat: list[Form] = []
         plNomArt: list[Form] = []
         plGenArt: list[Form] = []
@@ -409,7 +411,7 @@ class NP:
             if head.isImmutable:
                 mut = Mutation.Nil
             value = Opers.Mutate(mut, headFormPlGen.value)
-            plGen.append(Form(value))
+            plGen.append(FormPlGen(value, headFormPlGen.strength))
 
             if not head.isDefinite or head.allowArticledGenitive:  # with article:
                 mut = Mutation.Ecl1
@@ -459,9 +461,9 @@ class NP:
 
     # Creates a noun phrase from a noun modified by an adjective:
     @classmethod
-    def create_from_noun_adjective(cls, head: Noun, mod: Adjective) -> NP:
+    def create_from_noun_adjective(cls, head: NounType, mod: Adjective) -> NP:
         if mod.isPre:
-            prefixedHead: Noun = Noun.create_from_xml(head.printXml())
+            prefixedHead: NounType = NounType.create_from_xml(head.printXml())
             # create a copy of the head noun
             prefix: str = mod.getLemma()
             f: Form
@@ -677,7 +679,7 @@ class NP:
                     value = (
                         headFormPlGen.value + " " + Opers.Mutate(mutA, modForm.value)
                     )
-                    plGen.append(Form(value))
+                    plGen.append(FormPlGen(value, headFormPlGen.strength))
 
             for headFormPlGen in head.plGen:
                 # with article:
@@ -972,7 +974,7 @@ class NP:
             el = ET.SubElement(root, "plNom")
             el.set("default", f.value)
 
-        for f in self.plGen:
+        for fPlGen in self.plGen:
             el = ET.SubElement(root, "plGen")
             el.set("default", fPlGen.value)
 
@@ -1030,7 +1032,7 @@ class NP:
         sgDatArtS: list[FormSg] = []
         plNom: list[Form] = []
         plNomArt: list[Form] = []
-        plGen: list[Form] = []
+        plGen: list[FormPlGen] = []
         plGenArt: list[Form] = []
         plDat: list[Form] = []
         plDatArt: list[Form] = []
@@ -1072,7 +1074,8 @@ class NP:
             plNom.append(Form(el.get("default", "")))
 
         for el in root.findall("./plGen"):
-            plGen.append(Form(el.get("default", "")))
+            strength = Strength.Strong if el.get("strength", "weak") == "strong" else Strength.Weak
+            plGen.append(FormPlGen(el.get("default", ""), strength))
 
         for el in root.findall("./plNomArt"):
             plNomArt.append(Form(el.get("default", "")))

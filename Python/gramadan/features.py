@@ -42,18 +42,22 @@ class Gender(AutoName):
 
 # Encapsulates a word form, a phrase form or a clause form:
 @dataclass
-class Form:
+class FormV1:
     value: str
 
 
 # Class for noun and noun phrase forms in the singular:
 @dataclass
-class FormSg(Form):
+class FormSgV1(FormV1):
     gender: Gender
 
 
 # Class for noun forms in the plural genitive:
 @dataclass
-class FormPlGen(Form):
+class FormPlGenV1(FormV1):
     strength: Strength
     # in the plural genitive, a noun form has strength.
+
+Form = FormV1
+FormSg = FormSgV1
+FormPlGen = FormPlGenV1

@@ -10,7 +10,7 @@ from .features import FormSg, Form, FormPlGen, Gender
 
 # A class that encapsulates the singular forms of a noun or adjective:
 @dataclass
-class SingularInfo:
+class SingularInfoV1:
     gender: Gender
     nominative: list[Form] = field(default_factory=list)
     genitive: list[Form] = field(default_factory=list)
@@ -40,7 +40,7 @@ class SingularInfo:
             ret += "[" + f.value + "] "
         ret += "\n"
         return ret
-
+SingularInfo = SingularInfoV1
 
 # Singular class O: all cases are identical.
 class SingularInfoO(SingularInfo):

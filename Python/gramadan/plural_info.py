@@ -9,7 +9,7 @@ from .opers import Opers
 # for these so far.
 
 @dataclass
-class PluralInfo:
+class PluralInfoV1:
     strength: Strength
     nominative: list[Form] = field(default_factory=list)
     genitive: list[Form] = field(default_factory=list)
@@ -33,6 +33,7 @@ class PluralInfo:
             ret += "[" + f.value + "] "
         ret += "\n"
         return ret
+PluralInfo = PluralInfoV1
 
 
 # Plural class LgC: weak, plural formed by slenderization.

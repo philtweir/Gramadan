@@ -3,15 +3,15 @@ import re
 import logging
 import os
 
-from gramadan.noun import Noun
 from gramadan.features import Gender, FormSg
 from gramadan.opers import Opers
 from gramadan.singular_info import SingularInfoA, SingularInfoE, SingularInfoC, SingularInfoL, SingularInfoAX, SingularInfoEAX, SingularInfoD, SingularInfoN
+from gramadan.v2.noun import Noun
 from gramadan.v2.database import Database
 from gramadan.v2.semantic_groups import FAMILY
 from gramadan.v2.other_groups import POSSIBLE_LOANWORDS_GENITIVELESS, BUNAMO_ONLY_GENITIVELESS
 
-from gramadan.v2.noun import DeclensionInconsistentError, FormsMissingException, FormsAmbiguousException, NounDeclensionGuesser, re_ends
+from gramadan.v2.noun_declensions import DeclensionInconsistentError, FormsMissingException, FormsAmbiguousException, NounDeclensionGuesser, re_ends
 
 
 class NualeargaisNounDeclensionGuesser(NounDeclensionGuesser):

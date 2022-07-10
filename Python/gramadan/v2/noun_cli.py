@@ -1,10 +1,10 @@
 import sys
 import os
-from gramadan.noun import Noun
 from gramadan.features import Gender, FormSg
 from gramadan.v2.database import Database
 
-from .noun import DeclensionInconsistentError, FormsMissingException, FormsAmbiguousException, NounDeclensionGuesser
+from .noun import Noun
+from .noun_declensions import DeclensionInconsistentError, FormsMissingException, FormsAmbiguousException, NounDeclensionGuesser
 from .noun_empirical import EmpiricalNounDeclensionGuesser
 from .noun_nualeargais import NualeargaisNounDeclensionGuesser, NualeargaisFullNounDeclensionGuesser
 
