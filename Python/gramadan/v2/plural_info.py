@@ -20,7 +20,7 @@ class PluralInfo(PluralInfoV1):
     v1 = None
     super_type: Callable = PluralInfoV1
 
-    def __getattribute__(self, attr):
+    def __getattr__(self, attr):
         return getattr(self.v1, attr)
 
     def __setattribute__(self, attr, val):

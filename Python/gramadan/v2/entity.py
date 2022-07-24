@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 from lxml import etree as ET
 from typing import Union, TypeVar, Generic, Type
 from gramadan.verb import Verb
 
 T = TypeVar('T')
 class Entity(Generic[T]):
-    v1 = None
-    _forms: dict
+    v1: T
+    _forms: dict = {} # Prevents __getattr__ being called
     _form_fields: tuple = ()
     super_cls: Type[T]
 
@@ -17,9 +19,16 @@ class Entity(Generic[T]):
             yield field, forms
 
     def __getattr__(self, attr):
+        if attr == "v1": # This allows us to copy
+            raise AttributeError()
+
+        if attr in self._forms:
+            return self._forms[attr]
         return getattr(self.v1, attr)
 
     def __setattribute__(self, attr, val):
+        if attr in self._forms:
+            self._forms[attr] = val
         return setattr(self.v1, attr, val)
 
     # Forms of the preposition:
@@ -44,7 +53,7 @@ class Entity(Generic[T]):
         return forms
 
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> 'Entity':
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree]):
         v1 = cls.super_cls.create_from_xml(doc)
         return cls(v1=v1)
 

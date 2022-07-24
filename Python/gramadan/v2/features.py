@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 from dataclasses import dataclass
 from gramadan.features import FormV1, Gender, Strength
 
@@ -13,11 +13,17 @@ class Form(FormV1):
 # Class for noun and noun phrase forms in the singular:
 @dataclass
 class FormSg(Form):
-    gender: Gender
+    gender: Optional[Gender]
+    # We allow gender to be optional, as it may be unknown/undefined
+    # (e.g. seemingly many verbal nouns and proper nouns) but use of this attribute should
+    # then throw an error.
 
 
 # Class for noun forms in the plural genitive:
 @dataclass
 class FormPlGen(Form):
-    strength: Strength
+    strength: Optional[Strength]
     # in the plural genitive, a noun form has strength.
+    # We allow it to be optional, as it may be unknown/undefined
+    # (e.g. some proper nouns) but use of this attribute should
+    # then throw an error.
