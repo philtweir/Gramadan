@@ -14,7 +14,7 @@ on:
 
   push:
     tags:
-      - 'v*'
+      - 'v*-py'
 
 permissions:
   contents: read
