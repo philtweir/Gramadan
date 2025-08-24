@@ -27,7 +27,7 @@ class VPShape(AutoName):
     Declar = auto()
     Interrog = auto()
     # /*, RelDep, RelIndep, Report*/ }
-
+VPShapeType = VPShape
 
 class VPPerson(AutoName):
     Any = auto()
@@ -104,7 +104,7 @@ class VerbTenseRule:
 TenseDictionary = dict[VerbTense, dict[VerbDependency, dict[VerbPerson, list[Form]]]]
 MoodDictionary = dict[VerbMood, dict[VerbPerson, list[Form]]]
 TenseRuleDictionary = dict[
-    VPTense, dict[VPPerson, dict[VPShape, dict[VPPolarity, list[VerbTenseRule]]]]
+    VPTense, dict[VPPerson, dict[VPShapeType, dict[VPPolarity, list[VerbTenseRule]]]]
 ]
 
 # A verb:
@@ -189,7 +189,7 @@ class Verb:
 
     # Returns tense rules that match the parameters. In each paramer, '.Any' means 'any'.
     def getTenseRules(
-        self, tense: VPTense, person: VPPerson, shape: VPShape, polarity: VPPolarity
+        self, tense: VPTense, person: VPPerson, shape: VPShapeType, polarity: VPPolarity
     ) -> list[VerbTenseRule]:
         ret: list[VerbTenseRule] = []
         ts: Sequence[VPTense] = (
@@ -200,10 +200,10 @@ class Verb:
             VPTense.Fut,
             VPTense.Cond,
         )
-        ss: Sequence[VPShape] = (
-            VPShape.Declar,
-            VPShape.Interrog,
-        )  # /*, VPShape.RelDep, VPShape.RelIndep, VPShape.Report*/)
+        ss: Sequence[VPShapeType] = (
+            VPShapeType.Declar,
+            VPShapeType.Interrog,
+        )  # /*, VPShapeType.RelDep, VPShapeType.RelIndep, VPShapeType.Report*/)
         pers: Sequence[VPPerson] = (
             VPPerson.Sg1,
             VPPerson.Sg2,
@@ -221,14 +221,14 @@ class Verb:
         for t in ts:
             per: VPPerson
             for per in pers:
-                s: VPShape
+                s: VPShapeType
                 for s in ss:
                     pol: VPPolarity
                     for pol in pols:
                         if (
                             (tense == VPTense.Any or t == tense)
                             and (person == VPPerson.Any or per == person)
-                            and (shape == VPShape.Any or s == shape)
+                            and (shape == VPShapeType.Any or s == shape)
                             and (polarity == VPPolarity.Any or pol == polarity)
                         ):
                             rule: VerbTenseRule
@@ -249,10 +249,10 @@ class Verb:
             VPTense.Fut,
             VPTense.Cond,
         )
-        ss: Sequence[VPShape] = (
-            VPShape.Declar,
-            VPShape.Interrog,
-        )  # /*, VPShape.RelDep, VPShape.RelIndep, VPShape.Report*/ )
+        ss: Sequence[VPShapeType] = (
+            VPShapeType.Declar,
+            VPShapeType.Interrog,
+        )  # /*, VPShapeType.RelDep, VPShapeType.RelIndep, VPShapeType.Report*/ )
         pers: Sequence[VPPerson] = (
             VPPerson.Sg1,
             VPPerson.Sg2,
@@ -268,7 +268,7 @@ class Verb:
         t: VPTense
         p: VPPerson
         per: VPPerson
-        s: VPShape
+        s: VPShapeType
         pol: VPPolarity
         for t in ts:
             tenseRules[t] = {}
@@ -282,8 +282,8 @@ class Verb:
         # endregion
         # region default-rules
         pron: str
-        dec: VPShape = VPShape.Declar
-        rog: VPShape = VPShape.Interrog
+        dec: VPShapeType = VPShapeType.Declar
+        rog: VPShapeType = VPShapeType.Interrog
         pos: VPPolarity = VPPolarity.Pos
         neg: VPPolarity = VPPolarity.Neg
 
@@ -1370,24 +1370,24 @@ class Verb:
         # region change-rules-for-irregular-bí
         if verb.getLemma() == "bí":
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Declar, VPPolarity.Pos
+                VPTense.Past, VPPerson.Any, VPShapeType.Declar, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Len1
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Declar, VPPolarity.Neg
+                VPTense.Past, VPPerson.Any, VPShapeType.Declar, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Nil
                 rule.particle = "ní"
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Interrog, VPPolarity.Pos
+                VPTense.Past, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Nil
                 rule.particle = "an"
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Interrog, VPPolarity.Neg
+                VPTense.Past, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Nil
                 rule.particle = "nach"
@@ -1395,24 +1395,24 @@ class Verb:
         # region change-rules-for-irregular-abair
         if verb.getLemma() == "abair":
             for rule in verb.getTenseRules(
-                VPTense.Any, VPPerson.Any, VPShape.Declar, VPPolarity.Pos
+                VPTense.Any, VPPerson.Any, VPShapeType.Declar, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Nil
 
             for rule in verb.getTenseRules(
-                VPTense.Any, VPPerson.Any, VPShape.Declar, VPPolarity.Neg
+                VPTense.Any, VPPerson.Any, VPShapeType.Declar, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Nil
                 rule.particle = "ní"
 
             for rule in verb.getTenseRules(
-                VPTense.Any, VPPerson.Any, VPShape.Interrog, VPPolarity.Pos
+                VPTense.Any, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Ecl1x
                 rule.particle = "an"
 
             for rule in verb.getTenseRules(
-                VPTense.Any, VPPerson.Any, VPShape.Interrog, VPPolarity.Neg
+                VPTense.Any, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Ecl1
                 rule.particle = "nach"
@@ -1420,19 +1420,19 @@ class Verb:
         # region change-rules-for-irregular-déan
         if verb.getLemma() == "déan":
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Declar, VPPolarity.Neg
+                VPTense.Past, VPPerson.Any, VPShapeType.Declar, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Len1
                 rule.particle = "ní"
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Interrog, VPPolarity.Pos
+                VPTense.Past, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Ecl1x
                 rule.particle = "an"
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Interrog, VPPolarity.Neg
+                VPTense.Past, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Ecl1
                 rule.particle = "nach"
@@ -1440,53 +1440,53 @@ class Verb:
         # region change-rules-for-irregular-faigh
         if verb.getLemma() == "faigh":
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Declar, VPPolarity.Pos
+                VPTense.Past, VPPerson.Any, VPShapeType.Declar, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Nil
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Declar, VPPolarity.Neg
+                VPTense.Past, VPPerson.Any, VPShapeType.Declar, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Ecl1
                 rule.particle = "ní"
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Interrog, VPPolarity.Pos
+                VPTense.Past, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Ecl1x
                 rule.particle = "an"
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Interrog, VPPolarity.Neg
+                VPTense.Past, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Ecl1
                 rule.particle = "nach"
 
             for rule in verb.getTenseRules(
-                VPTense.Fut, VPPerson.Any, VPShape.Declar, VPPolarity.Pos
+                VPTense.Fut, VPPerson.Any, VPShapeType.Declar, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Len1
 
             for rule in verb.getTenseRules(
-                VPTense.Fut, VPPerson.Any, VPShape.Declar, VPPolarity.Neg
+                VPTense.Fut, VPPerson.Any, VPShapeType.Declar, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Ecl1
                 rule.particle = "ní"
 
             for rule in verb.getTenseRules(
-                VPTense.Fut, VPPerson.Any, VPShape.Interrog, VPPolarity.Pos
+                VPTense.Fut, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Ecl1x
                 rule.particle = "an"
 
             for rule in verb.getTenseRules(
-                VPTense.Fut, VPPerson.Any, VPShape.Interrog, VPPolarity.Neg
+                VPTense.Fut, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Ecl1
                 rule.particle = "nach"
 
             for rule in verb.getTenseRules(
-                VPTense.Cond, VPPerson.Any, VPShape.Declar, VPPolarity.Neg
+                VPTense.Cond, VPPerson.Any, VPShapeType.Declar, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Ecl1
                 rule.particle = "ní"
@@ -1494,24 +1494,24 @@ class Verb:
         # region change-rules-for-irregular-feic
         if verb.getLemma() == "feic":
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Declar, VPPolarity.Pos
+                VPTense.Past, VPPerson.Any, VPShapeType.Declar, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Len1
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Declar, VPPolarity.Neg
+                VPTense.Past, VPPerson.Any, VPShapeType.Declar, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Len1
                 rule.particle = "ní"
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Interrog, VPPolarity.Pos
+                VPTense.Past, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Ecl1x
                 rule.particle = "an"
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Interrog, VPPolarity.Neg
+                VPTense.Past, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Ecl1
                 rule.particle = "nach"
@@ -1519,24 +1519,24 @@ class Verb:
         # region change-rules-for-irregular-téigh
         if verb.getLemma() == "téigh":
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Declar, VPPolarity.Pos
+                VPTense.Past, VPPerson.Any, VPShapeType.Declar, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Len1
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Declar, VPPolarity.Neg
+                VPTense.Past, VPPerson.Any, VPShapeType.Declar, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Len1
                 rule.particle = "ní"
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Interrog, VPPolarity.Pos
+                VPTense.Past, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Pos
             ):
                 rule.mutation = Mutation.Ecl1x
                 rule.particle = "an"
 
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Any, VPShape.Interrog, VPPolarity.Neg
+                VPTense.Past, VPPerson.Any, VPShapeType.Interrog, VPPolarity.Neg
             ):
                 rule.mutation = Mutation.Ecl1
                 rule.particle = "nach"
@@ -1544,21 +1544,21 @@ class Verb:
         # region change-rules-for-irregular-tar
         if verb.getLemma() == "tar":
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Auto, VPShape.Any, VPPolarity.Any
+                VPTense.Past, VPPerson.Auto, VPShapeType.Any, VPPolarity.Any
             ):
                 rule.mutation = Mutation.Len1
         # endregion
         # region change-rules-for-irregular-clois
         if verb.getLemma() == "clois":
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Auto, VPShape.Any, VPPolarity.Any
+                VPTense.Past, VPPerson.Auto, VPShapeType.Any, VPPolarity.Any
             ):
                 rule.mutation = Mutation.Len1
         # endregion
         # region change-rules-for-irregular-cluin
         if verb.getLemma() == "cluin":
             for rule in verb.getTenseRules(
-                VPTense.Past, VPPerson.Auto, VPShape.Any, VPPolarity.Any
+                VPTense.Past, VPPerson.Auto, VPShapeType.Any, VPPolarity.Any
             ):
                 rule.mutation = Mutation.Len1
         # endregion

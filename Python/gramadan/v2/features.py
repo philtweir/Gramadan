@@ -1,6 +1,7 @@
 from typing import Union, Optional
+from enum import auto
 from dataclasses import dataclass
-from gramadan.features import FormV1, Gender, Strength
+from gramadan.features import FormV1, Gender, Strength, AutoName
 
 class Form(FormV1):
     test = 0
@@ -27,3 +28,21 @@ class FormPlGen(Form):
     # We allow it to be optional, as it may be unknown/undefined
     # (e.g. some proper nouns) but use of this attribute should
     # then throw an error.
+
+class Case(AutoName):
+    Nom = auto()
+    Gen = auto()
+    Dat = auto()
+    Voc = auto()
+
+class System(AutoName):
+    N = auto()
+    S = auto()
+
+class Article(AutoName):
+    NoArt = auto()
+    Art = auto()
+
+class Number(AutoName):
+    Sg = auto()
+    Pl = auto()

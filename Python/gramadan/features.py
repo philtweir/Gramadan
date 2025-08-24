@@ -5,6 +5,9 @@ from enum import Enum, auto
 
 # https://docs.python.org/3/library/enum.html#using-automatic-values
 class AutoName(Enum):
+    def __list__(self):
+        return [entry.value for entry in self]
+
     def _generate_next_value_(name, start, count, last_values):
         return name
 

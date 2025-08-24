@@ -1,6 +1,8 @@
 import logging
-from gramadan import features
+from gramadan import features, opers
 from .features import Form, FormSg, FormPlGen
+from .opers import Opers
+from .. import np
 
 logging.warning(
     "You are using the v2 package within GramadánPy. "
@@ -13,3 +15,5 @@ logging.warning(
 features.Form = Form
 features.FormSg = FormSg
 features.FormPlGen = FormPlGen
+opers.Opers = Opers
+np.Opers = Opers

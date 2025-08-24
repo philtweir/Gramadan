@@ -1,7 +1,16 @@
 import re
 from gramadan import opers
+from gramadan.features import Mutation
+
+PRINT_EXPLANATIONS = False
 
 class Opers(opers.Opers):
+    @staticmethod
+    def Mutate(mutation: Mutation, text: str, explanation: str | None = None) -> str:
+        if PRINT_EXPLANATIONS and explanation is not None:
+            print(explanation)
+        return opers.Opers.Mutate(mutation, text)
+
     @staticmethod
     def Demutate(text: str) -> str:
         demut = opers.Opers.Demutate(text)

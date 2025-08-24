@@ -4,6 +4,8 @@ from lxml import etree as ET
 from gramadan import preposition
 from .features import Form
 from .entity import Entity
+from .np import NP
+from .noun import Noun
 preposition.Form = Form
 
 # A class for a preposition:
@@ -109,3 +111,12 @@ class Preposition(Entity[preposition.Preposition]):
                 el.set("default", f.value)
 
         return doc
+
+    def __add__(self, other: NP | Noun) -> Entity:
+        from .pp import PP
+
+        if isinstance(other, NP):
+            ...
+        elif isinstance(other, Noun):
+            other = NP.create_from_noun(other)
+        return PP.create(self, other)

@@ -17,7 +17,7 @@ dependencies = [
 test = ["pytest>=6.2.5", "lxml-stubs>=0.3.0"]
 
 [build-system]
-requires = ["wheel", "setuptools ~= 62.1.0", "setuptools-scm"]
+requires = ["wheel", "setuptools ~= 74.0.0", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]

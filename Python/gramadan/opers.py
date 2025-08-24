@@ -67,7 +67,10 @@ class Opers:
 
     # Performs a mutation on the string:
     @staticmethod
-    def Mutate(mutation: Mutation, text: str) -> str:
+    def Mutate(mutation: Mutation, text: str, _: str | None = None) -> str:
+        # The dummy argument keeps v1 compatibility while allowing addition
+        # of explanations into the v1 modules (which otherwise would require
+        # copying all the logic).
         ret: str = ""
         pattern: str
 

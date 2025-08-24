@@ -3,6 +3,8 @@ from __future__ import annotations
 from lxml import etree as ET
 from typing import Union, TypeVar, Generic, Type
 from gramadan.verb import Verb
+from gramadan.features import Number, AutoName
+from gramadan.v2.features import Case, Gender, System, Article
 
 T = TypeVar('T')
 class Entity(Generic[T]):
@@ -67,3 +69,41 @@ class Entity(Generic[T]):
             if key in forms:
                 return True
         return False
+
+    def to(self, *features: list[AutoName]):
+        gender = [gdr for gdr in features if isinstance(gdr, Gender)]
+        number = [num for num in features if isinstance(num, Number)]
+        case = [cas for cas in features if isinstance(cas, Case)]
+        system = [sys for sys in features if isinstance(sys, System)]
+        article = [art for art in features if isinstance(art, Article)]
+
+        if any(len(descriptor) > 2 for descriptor in (gender, number, case)):
+            raise RuntimeError("Cannot specify more than one descriptor at a time")
+
+        form_name: str = ""
+        if number:
+            form_name += "Pl" if number[0] == Number.Pl else "Sg"
+        if case:
+            case = case[0]
+            if case == Case.Gen:
+                form_name += "Gen"
+            elif case == Case.Voc:
+                form_name += "Voc"
+            elif case == Case.Nom:
+                form_name += "Nom"
+            elif case == Case.Dat:
+                form_name += "Dat"
+        if article and article[0] == Article.Art:
+            form_name += "Art"
+        if gender:
+            if gender[0] == Gender.Masc:
+                form_name += "Masc"
+            elif gender[0] == Gender.Fem:
+                form_name += "Fem"
+        if system:
+            if system[0] == System.N:
+                form_name += "N"
+            elif gender[0] == System.S:
+                form_name += "S"
+        form_name = form_name[0].lower() + form_name[1:]
+        return self.forms[form_name]

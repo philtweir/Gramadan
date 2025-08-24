@@ -10,6 +10,7 @@ from .verb import Verb
 from .noun import Noun
 from .adjective import Adjective
 from .preposition import Preposition
+from .copula import Copula
 
 # EntityType = Union[
 #     Noun,
@@ -21,12 +22,12 @@ from .preposition import Preposition
 
 UPOS_TYPE_MAP = {
     "NOUN": "noun", "ADJ": "adjective", "ADP": "preposition",
-    "VERB": "verb"
+    "VERB": "verb", "AUX": "copula"
 }
 
 ENTITY_TYPE_MAP = {
     "noun": Noun, "adjective": Adjective, "preposition": Preposition,
-    "nounPhrase": NP, "verb": Verb
+    "nounPhrase": NP, "verb": Verb, "copula": Copula
 }
 
 S = TypeVar('S')
@@ -72,6 +73,7 @@ class DatabaseDictionary:
         self.dict_cls = dict_cls
         self.noun: DictType[Noun] = dict_cls()
         self.adjective: DictType[Adjective] = dict_cls()
+        self.copula: DictType[Copula] = dict_cls()
         self.preposition: DictType[Preposition] = dict_cls()
         self.nounPhrase: DictType[NP] = dict_cls()
         self.verb: DictType[Verb] = dict_cls()

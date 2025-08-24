@@ -1,5 +1,4 @@
-﻿from __future__ import annotations
-
+﻿
 from lxml import etree as ET
 from typing import Optional, Union
 
@@ -9,6 +8,8 @@ from .singular_info import SingularInfo
 from .plural_info import PluralInfo
 from .entity import Entity
 from .opers import Opers
+from .adjective import Adjective
+from ..possessive import Possessive
 noun.SingularInfo = SingularInfo
 noun.PluralInfo = PluralInfo
 noun.Form = Form
@@ -30,12 +31,12 @@ class Noun(Entity[noun.Noun]):
 
     # Constructors:
     @classmethod
-    def create_from_info(cls, si: SingularInfo, pi: Optional[PluralInfo] = None) -> Noun:
+    def create_from_info(cls, si: SingularInfo, pi: Optional[PluralInfo] = None) -> "Noun":
         v1 = noun.Noun.create_from_info(si, pi)
         return cls(v1=v1)
 
     @classmethod
-    def create_from_conllu(cls, token, default_nom_case: bool=False) -> Noun:
+    def create_from_conllu(cls, token, default_nom_case: bool=False) -> "Noun":
         if token.upos not in ("NOUN", "PROPN"):
             raise RuntimeError("Attempting to convert a CoNLL non-noun to a (partial) noun")
 
@@ -77,7 +78,7 @@ class Noun(Entity[noun.Noun]):
         cls,
         *args,
         **kwargs
-    ) -> Noun:
+    ) -> "Noun":
         v1 = noun.Noun.from_str(*args, **kwargs)
         return cls(v1=v1)
 
@@ -95,7 +96,7 @@ class Noun(Entity[noun.Noun]):
 
     @property
     def is_definite(self):
-        return self.v1.isProper
+        return self.v1.isDefinite
 
     @is_definite.setter
     def is_definite(self, definite: bool):
@@ -108,3 +109,11 @@ class Noun(Entity[noun.Noun]):
     @is_immutable.setter
     def is_immutable(self, immutable: bool):
         self.v1.isImmutable = immutable
+
+    def __add__(self, other: Adjective | Possessive) -> Entity:
+        from .np import NP
+        if isinstance(other, Adjective):
+            return NP.create_from_noun_adjective(self, other)
+        elif isinstance(other, Possive):
+            return NP.create_from_possessive(self, other)
+        raise ArgumentError("Must have an adjective or possessive")

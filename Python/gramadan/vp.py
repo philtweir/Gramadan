@@ -6,8 +6,10 @@ from .verb import VPTense, VPPerson, VPShape, VPPolarity, VPMood
 from .opers import Opers
 
 
+VerbType = Verb
+VPShapeType = VPShape
 VPTenseDictionary = dict[
-    VPTense, dict[VPShape, dict[VPPerson, dict[VPPolarity, list[Form]]]]
+    VPTense, dict[VPShapeType, dict[VPPerson, dict[VPPolarity, list[Form]]]]
 ]
 VPMoodDictionary = dict[VPMood, dict[VPPerson, dict[VPPolarity, list[Form]]]]
 
@@ -22,7 +24,7 @@ class VP:
 
     # Constructs a verbal phrase from a verb:
     @classmethod
-    def from_verb(cls, v: Verb) -> "VP":
+    def from_verb(cls, v: VerbType) -> "VP":
         # region prepare-structure
         ts: Sequence[VPTense] = (
             VPTense.Past,
@@ -33,10 +35,7 @@ class VP:
             VPTense.Cond,
         )
         ms: Sequence[VPMood] = (VPMood.Imper, VPMood.Subj)
-        ss: Sequence[VPShape] = (
-            VPShape.Declar,
-            VPShape.Interrog,
-        )  # , VPShape.RelDep, VPShape.RelIndep, VPShape.Report*
+        ss: Sequence[VPShapeType] = tuple(VPShapeType)  # , VPShapeType.RelIndep, VPShapeType.Report*
         pers: Sequence[VPPerson] = (
             VPPerson.Sg1,
             VPPerson.Sg2,
@@ -53,7 +52,7 @@ class VP:
         vForm: Form
         tenses: VPTenseDictionary = {}
         t: VPTense
-        s: VPShape
+        s: VPShapeType
         per: VPPerson
         hasSyntheticForms: bool
 
@@ -97,7 +96,7 @@ class VP:
                                 if (
                                     v.getLemma() == "bí"
                                     and t == VPTense.Pres
-                                    and s == VPShape.Declar
+                                    and s == VPShapeType.Declar
                                     and l == VPPolarity.Neg
                                     and vpForm.value.startswith("ní fhuil")
                                 ):
@@ -200,7 +199,7 @@ class VP:
         return cls(tenses=tenses, moods=moods)
 
     # Prints a user-friendly summary of the verbal phrase in one of its tenses, shapes and polarities:
-    def print_by_tense(self, tense: VPTense, shape: VPShape, pol: VPPolarity) -> str:
+    def print_by_tense(self, tense: VPTense, shape: VPShapeType, pol: VPPolarity) -> str:
         ret: str = ""
         pers: Sequence[VPPerson] = (
             VPPerson.Sg1,

@@ -4,7 +4,7 @@ from lxml import etree as ET
 from typing import Optional, Union
 from gramadan import np
 from gramadan.possessive import Possessive
-from .features import Form
+from .features import Form, Gender
 from .noun import Noun
 from .adjective import Adjective
 from .entity import Entity
@@ -67,3 +67,7 @@ class NP(Entity[np.NP]):
     def create_from_noun_adjective(cls, head: Noun, mod: Adjective) -> NP:
         v1 = cls.super_cls.create_from_noun_adjective(head, mod) # type: ignore
         return cls(v1=v1)
+
+    @property
+    def is_definite(self) -> bool:
+        return self.v1.isDefinite

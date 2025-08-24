@@ -231,7 +231,11 @@ class NP:
         mut: Mutation
 
         mut = Mutation.PrefT if gender == Gender.Masc else Mutation.Len3
-        value = "an " + Opers.Mutate(mut, sgNomStr)
+        value = "an " + Opers.Mutate(
+            mut,
+            sgNomStr,
+            "NP|sgNom>sgNomArt: lenite feminine (or t- masculine vowels)"
+        )
         sgNomArt: list[FormSg] = [FormSg(value, gender)]
         # }
         # endregion
@@ -242,7 +246,11 @@ class NP:
         # { # with article:
         mut = Mutation.Len3 if gender == Gender.Masc else Mutation.PrefH
         article: str = "an" if gender == Gender.Masc else "na"
-        value = article + " " + Opers.Mutate(mut, sgGenStr)
+        value = article + " " + Opers.Mutate(
+            mut,
+            sgGenStr,
+            "NP|sgGenArt: where possible, prefixes h- to singular nominative if feminine beginning with vowel, otherwise lenites"
+        )
         sgGenArt: list[FormSg] = [FormSg(value, gender)]
         # }
         # endregion
@@ -251,7 +259,11 @@ class NP:
         plNom: list[Form] = [Form(plNomStr)]
         # }
         # { # with article:
-        value = "na " + Opers.Mutate(Mutation.PrefH, plNomStr)
+        value = "na " + Opers.Mutate(
+            Mutation.PrefH,
+            plNomStr,
+            "NP|plNomArt: add h- to feminine vowels"
+        )
         plNomArt: list[Form] = [Form(value)]
         # }
         # endregion
@@ -260,7 +272,11 @@ class NP:
         plGen: list[Form] = [Form(plNomStr)]
         # }
         # { # with article:
-        value = "na " + Opers.Mutate(Mutation.Ecl1, plGenStr)
+        value = "na " + Opers.Mutate(
+            Mutation.Ecl1,
+            plGenStr,
+            "NP|plGenArt: where possible, eclipses"
+        )
         plGenArt: list[Form] = [Form(value)]
         # }
         # endregion
@@ -273,7 +289,11 @@ class NP:
         sgDatArtS: list[FormSg] = [FormSg(sgNomStr, gender)]  # PTW: yes, nominative
 
         mut = Mutation.PrefT if gender == Gender.Masc else Mutation.Len3
-        value = "an " + Opers.Mutate(mut, sgNomStr)
+        value = "an " + Opers.Mutate(
+            mut,
+            sgNomStr,
+            "NP|sgNom>sgNomArt: lenite feminine (or t- masculine vowels)"
+        )
         # PTW: TODO - not entirely clear why sgNomArt is being appended to here... (but true in CS also l152)
         sgNomArt.append(FormSg(value, gender))
         # }
@@ -309,7 +329,7 @@ class NP:
 
     # Creates a noun phrase from a noun determined by a possessive pronoun:
     @classmethod
-    def create_from_possessive(cls, head: NounType, poss: Possessive) -> NP:
+    def create_from_possessive(cls, head: NounType, poss: Possessive) -> "NP":
         np = cls.create_from_noun(head)
         np._makePossessive(poss)
         return np
@@ -318,14 +338,14 @@ class NP:
     @classmethod
     def create_from_noun_adjective_possessive(
         cls, head: NounType, mod: Adjective, poss: Possessive
-    ) -> NP:
+    ) -> "NP":
         np = cls.create_from_noun_adjective(head, mod)
         np._makePossessive(poss)
         return np
 
     # Creates a noun phrase from a noun:
     @classmethod
-    def create_from_noun(cls, head: NounType) -> NP:
+    def create_from_noun(cls, head: NounType) -> "NP":
         isDefinite = head.isDefinite
         isImmutable = head.isImmutable
         # region singular-nominative
@@ -362,7 +382,13 @@ class NP:
                 )
                 if head.isImmutable:
                     mut = Mutation.Nil
-                value = "an " + Opers.Mutate(mut, headFormSg.value)
+                value = "an " + Opers.Mutate(
+                    mut,
+                    headFormSg.value,
+                    "NP|noun.sgNom>noun.sgNomArt: would lenite feminine but noun is immutable"
+                    if head.isImmutable else
+                    "NP|noun.sgNom>noun.sgNomArt: lenite feminine (or t- masculine vowels)"
+                )
                 sgNomArt.append(FormSg(value, headFormSg.gender))
 
         # endregion
@@ -373,7 +399,15 @@ class NP:
             # proper nouns are always lenited in the genitive
             if head.isImmutable:
                 mut = Mutation.Nil
-            value = Opers.Mutate(mut, headFormSg.value)
+            value = Opers.Mutate(
+                mut,
+                headFormSg.value,
+                (
+                    "NP|noun.sgGen>noun.sgGen: would mutate as proper noun but noun is immutable"
+                    if head.isImmutable else
+                    "NP|noun.sgGen>noun.sgGen: lenite if possible as proper noun"
+                ) if head.isProper else None
+            )
             sgGen.append(FormSg(value, headFormSg.gender))
 
             # with article:
@@ -386,7 +420,15 @@ class NP:
                 if head.isImmutable:
                     mut = Mutation.Nil
                 article = "an" if headFormSg.gender == Gender.Masc else "na"
-                value = article + " " + Opers.Mutate(mut, headFormSg.value)
+                value = article + " " + Opers.Mutate(
+                    mut,
+                    headFormSg.value,
+                    (
+                        "NP|noun.sgGen>noun.sgGen: indefinite and allows article in genitive but noun is immutable"
+                        if head.isImmutable else
+                        "NP|noun.sgGen>noun.sgGen: indefinite and allows article in genitive so lenite masculine or h- with feminine vowels"
+                    ) if head.isProper else None
+                )
                 sgGenArt.append(FormSg(value, headFormSg.gender))
 
         # endregion
@@ -399,7 +441,15 @@ class NP:
                 mut = Mutation.PrefH
                 if head.isImmutable:
                     mut = Mutation.Nil
-                value = "na " + Opers.Mutate(mut, headForm.value)
+                value = "na " + Opers.Mutate(
+                    mut,
+                    headForm.value,
+                    (
+                        "NP|noun.plNom>noun.plNomArt: would h- vowels but noun is immutable"
+                        if head.isImmutable else
+                        "NP|noun.plNom>noun.plNomArt: h- vowels"
+                    )
+                )
                 plNomArt.append(Form(value))
 
         # endregion
@@ -410,14 +460,30 @@ class NP:
             # proper nouns are always lenited in the articleless genitive
             if head.isImmutable:
                 mut = Mutation.Nil
-            value = Opers.Mutate(mut, headFormPlGen.value)
+            value = Opers.Mutate(
+                mut,
+                headFormPlGen.value,
+                (
+                    "NP|noun.plGen>noun.plGen: would lenite as proper but noun is immutable"
+                    if head.isImmutable else
+                    "NP|noun.plGen>noun.plGen: leniting the proper noun"
+                ) if head.isProper else None
+            )
             plGen.append(FormPlGen(value, headFormPlGen.strength))
 
             if not head.isDefinite or head.allowArticledGenitive:  # with article:
                 mut = Mutation.Ecl1
                 if head.isImmutable:
                     mut = Mutation.Nil
-                value = "na " + Opers.Mutate(mut, headFormPlGen.value)
+                value = "na " + Opers.Mutate(
+                    mut,
+                    headFormPlGen.value,
+                    (
+                        "NP|noun.plGen>noun.plGenArt: would eclipse as definite and noun allows articled genitive but noun is immutable"
+                        if head.isImmutable else
+                        "NP|noun.plGen>noun.plGenArt: eclipsing as noun is definite and allows article in genitive"
+                    )
+                )
                 plGenArt.append(Form(value))
 
         # endregion
@@ -461,7 +527,7 @@ class NP:
 
     # Creates a noun phrase from a noun modified by an adjective:
     @classmethod
-    def create_from_noun_adjective(cls, head: NounType, mod: Adjective) -> NP:
+    def create_from_noun_adjective(cls, head: NounType, mod: Adjective) -> "NP":
         if mod.isPre:
             prefixedHead: NounType = NounType.create_from_xml(head.printXml())
             # create a copy of the head noun
@@ -541,7 +607,11 @@ class NP:
                         if headFormSg.gender == Gender.Masc
                         else Mutation.Len1
                     )
-                    value = headFormSg.value + " " + Opers.Mutate(mutA, modForm.value)
+                    value = headFormSg.value + " " + Opers.Mutate(
+                        mutA,
+                        modForm.value,
+                        "NP|adjective.sgNom>adjective.sgNom: leniting if feminine (no t-)"
+                    )
                     sgNom.append(FormSg(value, headFormSg.gender))
 
                 if not head.isDefinite:  # with article:
@@ -560,9 +630,21 @@ class NP:
                         )
                         value = (
                             "an "
-                            + Opers.Mutate(mutN, headFormSg.value)
+                            + Opers.Mutate(
+                                mutN,
+                                headFormSg.value,
+                                (
+                                    "NP|noun.sgNom>noun.sgNomArt: would t- masc vowel, or lenite feminine but noun is immutable"
+                                    if head.isImmutable else
+                                    "NP|noun.sgNom>noun.sgNomArt: t- masc vowel, or lenite feminine"
+                                )
+                            )
                             + " "
-                            + Opers.Mutate(mutA, modForm.value)
+                            + Opers.Mutate(
+                                mutA,
+                                modForm.value,
+                                "NP|adjective.sgNom>adjective.sgNomArt: lenite if feminine (no t-)"
+                            )
                         )
                         sgNomArt.append(FormSg(value, headFormSg.gender))
 
@@ -584,9 +666,25 @@ class NP:
                         else Mutation.Nil
                     )
                     value = (
-                        Opers.Mutate(mutN, headFormSg.value)
+                        Opers.Mutate(
+                            mutN,
+                            headFormSg.value,
+                            (
+                                "NP|noun.sgGen>noun.sgGen: would lenite if masculine but noun is immmutable (no t-)"
+                                if head.isImmutable else
+                                "NP|noun.sgGen>noun.sgGen: lenite if masculine (no t-)"
+                            ) if head.isProper else None
+                        )
                         + " "
-                        + Opers.Mutate(mutA, modForm.value)
+                        + Opers.Mutate(
+                            mutA,
+                            modForm.value,
+                            (
+                                "NP|adjective.sgGenMasc>adjective.sgGen: lenite as masculine (no t-)"
+                                if headFormSg.gender == Gender.Masc else
+                                "NP|adjective.sgGenFem>adjective.sgGen: use feminine form of adjective in genitive"
+                            )
+                        )
                     )
                     sgGen.append(FormSg(value, headFormSg.gender))
 
@@ -615,9 +713,25 @@ class NP:
                         value = (
                             article
                             + " "
-                            + Opers.Mutate(mutN, headFormSg.value)
+                            + Opers.Mutate(
+                                mutN,
+                                headFormSg.value,
+                                (
+                                    "NP|noun.sgGen>noun.sgGenArt: would lenite if masculine but noun is immmutable"
+                                    if head.isImmutable else
+                                    "NP|noun.sgGen>noun.sgGenArt: lenite if masculine or h- if feminine vowel"
+                                )
+                            )
                             + " "
-                            + Opers.Mutate(mutA, modForm.value)
+                            + Opers.Mutate(
+                                mutA,
+                                modForm.value,
+                                (
+                                    "NP|adjective.sgGenMasc>adjective.sgGenArt: lenite as masculine (no t-)"
+                                    if headFormSg.gender == Gender.Masc else
+                                    "NP|adjective.sgGenFem>adjective.sgGenArt: use feminine form of adjective genitive"
+                                )
+                            )
                         )
                         sgGenArt.append(FormSg(value, headFormSg.gender))
 
@@ -632,7 +746,11 @@ class NP:
                         if Opers.IsSlender(headForm.value)
                         else Mutation.Nil
                     )
-                    value = headForm.value + " " + Opers.Mutate(mutA, modForm.value)
+                    value = headForm.value + " " + Opers.Mutate(
+                        mutA,
+                        modForm.value,
+                        "NP|adjective.plNom>adjective.plNom: lenite adjective if noun is slender"
+                    )
                     plNom.append(Form(value))
 
                 if not head.isDefinite:  # with article:
@@ -647,9 +765,17 @@ class NP:
                         )
                         value = (
                             "na "
-                            + Opers.Mutate(mutN, headForm.value)
+                            + Opers.Mutate(
+                                mutN,
+                                headForm.value,
+                                "NP|noun.plNom>noun.plNomArt: h- if noun is mutable and vowel"
+                            )
                             + " "
-                            + Opers.Mutate(mutA, modForm.value)
+                            + Opers.Mutate(
+                                mutA,
+                                modForm.value,
+                                "NP|adjective.plNom>adjective.plNomArt: lenite if noun is slender"
+                            )
                         )
                         plNomArt.append(Form(value))
 
@@ -677,7 +803,15 @@ class NP:
                         )
                         # "Gael", "captaen" are not slender
                     value = (
-                        headFormPlGen.value + " " + Opers.Mutate(mutA, modForm.value)
+                        headFormPlGen.value + " " + Opers.Mutate(
+                            mutA,
+                            modForm.value,
+                            (
+                                "NP|adjective.plNom>adjective.plGen: noun is strong so use adjective plural and lenite if noun plural genitive is slender"
+                                if headFormPlGen.strength == Strength.Strong else
+                                "NP|adjective.sgNom>adjective.plGen: noun is weak so use adjective singular and lenite if noun plural genitive is slender"
+                            )
+                        )
                     )
                     plGen.append(FormPlGen(value, headFormPlGen.strength))
 
@@ -707,9 +841,20 @@ class NP:
                             # "Gael", "captaen" are not slender
                         value = (
                             "na "
-                            + Opers.Mutate(mutN, headFormPlGen.value)
+                            + Opers.Mutate(
+                                mutN,
+                                headFormPlGen.value
+                            )
                             + " "
-                            + Opers.Mutate(mutA, modForm.value)
+                            + Opers.Mutate(
+                                mutA,
+                                modForm.value,
+                                (
+                                    "NP|adjective.plNom>adjective.plGen: noun is strong so use adjective plural and lenite if noun plural genitive is slender"
+                                    if headFormPlGen.strength == Strength.Strong else
+                                    "NP|adjective.sgNom>adjective.plGen: noun is weak so use adjective singular and lenite if noun plural genitive is slender"
+                                )
+                            )
                         )
                         plGenArt.append(Form(value))
 
@@ -1012,7 +1157,7 @@ class NP:
         return doc
 
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> NP:
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> "NP":
         if isinstance(doc, str):
             xml = ET.parse(doc)
             return cls.create_from_xml(xml)
