@@ -36,8 +36,8 @@ class Pronoun(Entity["Pronoun"]):
         ss: Sequence[VPShape] = (
             VPShape.Declar,
             VPShape.Interrog,
-            VPShape.RelDepDir,
-            VPShape.RelDepIndir,
+            VPShape.RelDep,
+            VPShape.RelIndep,
             VPShape.Report
         )
         ps: Sequence[VPPolarity] = (

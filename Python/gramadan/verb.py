@@ -95,13 +95,13 @@ class VerbTenseRule:
 
     # Which verb form to use:
     verbTense: VerbTense
-    verbDependency: VerbDependency
+    verbDependency: VD
     verbPerson: VerbPerson
 
     pronoun: str = ""
 
 
-TenseDictionary = dict[VerbTense, dict[VerbDependency, dict[VerbPerson, list[Form]]]]
+TenseDictionary = dict[VerbTense, dict[VD, dict[VerbPerson, list[Form]]]]
 MoodDictionary = dict[VerbMood, dict[VerbPerson, list[Form]]]
 TenseRuleDictionary = dict[
     VPTense, dict[VPPerson, dict[VPShapeType, dict[VPPolarity, list[VerbTenseRule]]]]
@@ -149,7 +149,7 @@ class Verb:
             VerbTense.Cond,
         )
         ms: Sequence[VerbMood] = (VerbMood.Imper, VerbMood.Subj)
-        ds: Sequence[VerbDependency] = (VerbDependency.Indep, VerbDependency.Dep)
+        ds: Sequence[VD] = (VD.Indep, VD.Dep, VD.RelIndep)
         ps: Sequence[VerbPerson] = (
             VerbPerson.Base,
             VerbPerson.Sg1,
@@ -162,7 +162,7 @@ class Verb:
         )
 
         t: VerbTense
-        d: VerbDependency
+        d: VD
         p: VerbPerson
         m: VerbMood
 
@@ -203,6 +203,7 @@ class Verb:
         ss: Sequence[VPShapeType] = (
             VPShapeType.Declar,
             VPShapeType.Interrog,
+            VPShapeType.RelIndep
         )  # /*, VPShapeType.RelDep, VPShapeType.RelIndep, VPShapeType.Report*/)
         pers: Sequence[VPPerson] = (
             VPPerson.Sg1,
@@ -238,6 +239,7 @@ class Verb:
 
     # Constructor:
     def _populate_tense_rules(self) -> None:
+        # PTW: should this be global?
         tenseRules: TenseRuleDictionary = {}
 
         # region prepare-structure-for-rules
@@ -1323,25 +1325,25 @@ class Verb:
 
         # Helper methods to add forms quickly:
         def _addTenseDep(
-            t: VerbTense, d: VerbDependency, p: VerbPerson, form: str
+            t: VerbTense, d: VD, p: VerbPerson, form: str
         ) -> None:
             tenses[t][d][p].append(Form(form))
 
         def _addTense(
-            t: VerbTense, d: Optional[VerbDependency], p: VerbPerson, form: str
+            t: VerbTense, d: Optional[VD], p: VerbPerson, form: str
         ) -> None:
             if d:
                 tenses[t][d][p].append(Form(form))
             else:
-                tenses[t][VerbDependency.Indep][p].append(Form(form))
-                tenses[t][VerbDependency.Dep][p].append(Form(form))
+                tenses[t][VD.Indep][p].append(Form(form))
+                tenses[t][VD.Dep][p].append(Form(form))
 
         def _addMood(m: VerbMood, p: VerbPerson, form: str) -> None:
             moods[m][p].append(Form(form))
 
         el: ET._Element
         value: str
-        dependency: VerbDependency
+        dependency: VD
         person: VerbPerson
         tense: VerbTense
 
@@ -1354,7 +1356,7 @@ class Verb:
         for el in root.findall("./tenseForm"):
             value = el.get("default", "")
             tense = VerbTense(el.get("tense"))
-            dependency = VerbDependency(el.get("dependency"))
+            dependency = VD(el.get("dependency"))
             person = VerbPerson(el.get("person"))
             _addTense(tense, dependency, person, value)
 
@@ -1574,10 +1576,10 @@ class Verb:
         if ret == "":
             # if not available, then the past tense base is the lemma:
             if (
-                len(self.tenses[VerbTense.Past][VerbDependency.Indep][VerbPerson.Base])
+                len(self.tenses[VerbTense.Past][VD.Indep][VerbPerson.Base])
                 > 0
             ):
-                ret = self.tenses[VerbTense.Past][VerbDependency.Indep][
+                ret = self.tenses[VerbTense.Past][VD.Indep][
                     VerbPerson.Base
                 ][0].value
 
@@ -1601,7 +1603,7 @@ class Verb:
             el.set("default", f.value)
 
         tense: VerbTense
-        dependency: VerbDependency
+        dependency: VD
         person: VerbPerson
 
         for tense in self.tenses:

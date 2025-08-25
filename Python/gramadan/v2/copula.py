@@ -39,8 +39,8 @@ class Copula(Entity["Copula"]):
         ss: Sequence[VPShape] = (
             VPShape.Declar,
             VPShape.Interrog,
-            VPShape.RelDepDir,
-            VPShape.RelDepIndir,
+            VPShape.RelIndep,
+            VPShape.RelDep,
             VPShape.Report
         )
         ps: Sequence[VPPolarity] = (
