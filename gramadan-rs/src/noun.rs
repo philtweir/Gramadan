@@ -435,6 +435,15 @@ fn is_fifth_simple(_lemma: &str, _gender: Gender) -> bool {
 }
 
 fn is_fourth_simple(lemma: &str, gender: Gender) -> bool {
+    // Loanwords with consonant ending → 4th
+    if in_list(lemma, POSSIBLE_LOANWORDS_GENITIVELESS) {
+        if let Some(last) = lemma.chars().last() {
+            if opers::CONSONANTS.contains(last.to_lowercase().next().unwrap_or(last)) {
+                return true;
+            }
+        }
+    }
+
     if gender == Gender::Fem && re_ends(lemma, &["[eí]"]) {
         return true;
     }
@@ -461,7 +470,7 @@ fn is_second_simple(lemma: &str, gender: Gender) -> bool {
     if opers::is_slender(lemma) {
         return true;
     }
-    if re_ends(lemma, &["eog", "óg", "lann"]) {
+    if re_ends(lemma, &["eog", "óg", "lann", "ach"]) {
         return true;
     }
     false
@@ -481,6 +490,11 @@ fn is_first_simple(lemma: &str, gender: Gender) -> bool {
 /// Includes irregular word lists, TEACH_FAMILY, loanword handling.
 /// Check order: 4th → 1st → 2nd → 5th, default 3rd.
 pub fn guess_declension_full(lemma: &str, gender: Gender) -> Declension {
+    // FAMILY → 5th (check before IRREGULAR_DECLENSION so deirfiúr/siúr get 5th)
+    if in_list(lemma, FAMILY) {
+        return Declension::Fifth;
+    }
+
     // IRREGULAR_DECLENSION (full guesser override — does not include deoch)
     if in_irregular_declension(lemma, IRREGULAR_DECLENSION_FULL) {
         return Declension::Irregular;
@@ -492,11 +506,6 @@ pub fn guess_declension_full(lemma: &str, gender: Gender) -> Declension {
     // FULLY_IRREGULAR (inherited from base)
     if let Some((dec, _)) = lookup_fully_irregular(lemma) {
         return Declension::from_i8(dec).unwrap_or(Declension::Irregular);
-    }
-
-    // IRREGULAR_GROUPS: FAMILY → 5th
-    if in_list(lemma, FAMILY) {
-        return Declension::Fifth;
     }
 
     // TEACH_FAMILY → Irregular
