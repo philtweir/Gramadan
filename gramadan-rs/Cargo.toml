@@ -1,0 +1,15 @@
+[package]
+name = "gramadan"
+version = "0.1.0"
+edition = "2021"
+description = "Irish language morphology engine — declension, conjugation, and mutation operations"
+license = "MIT"
+
+[dependencies]
+regex = "1"
+once_cell = "1"
+quick-xml = "0.37"
+
+[[bin]]
+name = "cross-validate"
+path = "src/bin/cross_validate.rs"
