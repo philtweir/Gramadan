@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::features::{Form, FormPlGen, FormSg, Gender};
 use crate::opers;
 use crate::plural_info::PluralInfo;
@@ -145,6 +147,117 @@ impl Declension {
             -1 => Some(Declension::Irregular),
             _ => None,
         }
+    }
+}
+
+// ============================================================
+// Compound decomposition — LemmaDb
+// ============================================================
+
+/// A database of known lemmas for compound decomposition.
+///
+/// When the morphological rules can't determine declension, we check
+/// whether the word is a compound whose head (final element) is a known
+/// word — and if so, inherit its declension. Irish compounds take their
+/// gender and declension from the head word, and the join point is often
+/// lenited (e.g. `aol` + `cloch` → `aolchloch`).
+#[derive(Debug, Clone)]
+pub struct LemmaDb {
+    /// Maps lemma → (declension, gender)
+    entries: HashMap<String, (i8, Gender)>,
+}
+
+/// Lenition pairs: mutated form → original consonant.
+const DEMUT_PAIRS: &[(&str, &str)] = &[
+    ("bh", "b"), ("ch", "c"), ("dh", "d"), ("fh", "f"),
+    ("gh", "g"), ("mh", "m"), ("ph", "p"), ("sh", "s"), ("th", "t"),
+];
+
+/// Words whose declension is inconsistent between standalone and compound
+/// use in BuNaMo. Excluded from compound head matching.
+const COMPOUND_HEAD_BLACKLIST: &[&str] = &["beart"];
+
+impl LemmaDb {
+    pub fn new() -> Self {
+        Self { entries: HashMap::new() }
+    }
+
+    /// Build from an iterator of (lemma, declension, gender).
+    pub fn from_iter(iter: impl IntoIterator<Item = (String, i8, Gender)>) -> Self {
+        let mut db = Self::new();
+        for (lemma, dec, gender) in iter {
+            db.entries.insert(lemma, (dec, gender));
+        }
+        db
+    }
+
+    pub fn insert(&mut self, lemma: String, declension: i8, gender: Gender) {
+        self.entries.insert(lemma, (declension, gender));
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Find the compound head of a word: the longest known suffix,
+    /// including demutating the join point to undo lenition.
+    ///
+    /// Only returns matches where the head word's gender matches
+    /// `required_gender`, since Irish compounds inherit the head's gender.
+    /// Requires the head to be at least 3 chars to avoid spurious matches.
+    /// Find compound head by looking for lenition at an internal boundary.
+    ///
+    /// Scans for internal lenited consonants (`ch`, `bh`, `fh`, etc.) — a
+    /// strong structural signal that the word is a compound. At each such
+    /// point, demutates and checks if the result is a known lemma with
+    /// matching gender. Also requires the prefix (the part before the
+    /// lenited join) to be a known word, to avoid false matches on words
+    /// like `droichead` where `ch` is part of the root, not a join.
+    ///
+    /// Returns the longest matching head's declension.
+    pub fn find_compound_head(&self, lemma: &str, required_gender: Gender) -> Option<i8> {
+        let mut best: Option<(i8, usize)> = None; // (declension, head_len)
+
+        let chars: Vec<(usize, char)> = lemma.char_indices().collect();
+
+        for ci in 1..chars.len() {
+            let (byte_pos, _) = chars[ci];
+            let prefix = &lemma[..byte_pos];
+
+            // Prefix must be at least 3 chars to avoid trivial splits.
+            if prefix.len() < 3 {
+                continue;
+            }
+
+            let tail = &lemma[byte_pos..];
+
+            // Check each lenition pair at this position
+            for &(mutated, original) in DEMUT_PAIRS {
+                if tail.starts_with(mutated) {
+                    let candidate = format!("{}{}", original, &tail[mutated.len()..]);
+                    // Head must be >= 5 chars to avoid spurious short matches
+                    // like cead, meas, teas which appear naturally in roots.
+                    if candidate.len() >= 5
+                        && candidate != lemma
+                        && !COMPOUND_HEAD_BLACKLIST.contains(&candidate.as_str())
+                    {
+                        if let Some(&(dec, gender)) = self.entries.get(candidate.as_str()) {
+                            if gender == required_gender {
+                                if best.is_none() || candidate.len() > best.unwrap().1 {
+                                    best = Some((dec, candidate.len()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        best.map(|(dec, _)| dec)
     }
 }
 
@@ -428,6 +541,30 @@ pub fn guess_declension(lemma: &str, gender: Gender) -> Declension {
     }
 
     Declension::Third
+}
+
+/// Guess noun declension with compound decomposition.
+///
+/// Compound decomposition is tried **first**: Irish compounds always
+/// take the declension of their final element (head word), so if we
+/// can identify a known head word (including through lenition at the
+/// join point), we trust it over morphological rules. The rules are
+/// the fallback for non-compound words.
+pub fn guess_declension_compound(lemma: &str, gender: Gender, db: &LemmaDb) -> Declension {
+    // Exception lookups always take priority
+    if let Some((dec, _)) = lookup_fully_irregular(lemma) {
+        return Declension::from_i8(dec).unwrap_or(Declension::Irregular);
+    }
+
+    // Compound decomposition: if the word ends with a known lemma
+    // (possibly lenited at the join), inherit its declension.
+    // Only match when head is shorter than the full word (i.e. there's a prefix).
+    if let Some(head_dec) = db.find_compound_head(lemma, gender) {
+        return Declension::from_i8(head_dec).unwrap_or(Declension::Third);
+    }
+
+    // Fall back to morphological rules
+    guess_declension(lemma, gender)
 }
 
 fn is_fifth_simple(_lemma: &str, _gender: Gender) -> bool {

@@ -255,29 +255,38 @@ fn validate_noun_declension_guessing(data_path: &Path) {
         .filter(|e| e.path().extension().map_or(false, |ext| ext == "xml"))
         .collect();
 
-    let mut total = 0;
-    let mut correct_simple = 0;
-    let mut correct_full = 0;
-    let mut confusion_simple: HashMap<(i8, i8), usize> = HashMap::new();
-    let mut confusion_full: HashMap<(i8, i8), usize> = HashMap::new();
+    // First pass: build LemmaDb from all nouns with declension 1-5
+    let mut db = noun::LemmaDb::new();
+    let mut test_nouns: Vec<BuNaMoNoun> = Vec::new();
 
     for entry in &entries {
         let path = entry.path();
-        let noun = match parse_noun_xml(&path) {
+        let n = match parse_noun_xml(&path) {
             Some(n) => n,
             None => continue,
         };
-
-        // Skip declension 0 (irregular/unclassified)
-        if noun.declension == 0 || noun.declension < 1 || noun.declension > 5 {
-            continue;
+        if n.declension >= 1 && n.declension <= 5 {
+            db.insert(n.lemma.clone(), n.declension, n.gender);
+            test_nouns.push(n);
         }
+    }
+    println!("LemmaDb: {} entries", db.len());
 
+    let mut total = 0;
+    let mut correct_simple = 0;
+    let mut correct_full = 0;
+    let mut correct_compound = 0;
+    let mut confusion_simple: HashMap<(i8, i8), usize> = HashMap::new();
+    let mut confusion_full: HashMap<(i8, i8), usize> = HashMap::new();
+    let mut confusion_compound: HashMap<(i8, i8), usize> = HashMap::new();
+
+    for noun in &test_nouns {
         total += 1;
         let expected = noun.declension;
 
         let guessed_simple = noun::guess_declension(&noun.lemma, noun.gender);
         let guessed_full = noun::guess_declension_full(&noun.lemma, noun.gender);
+        let guessed_compound = noun::guess_declension_compound(&noun.lemma, noun.gender, &db);
 
         if guessed_simple.as_i8() == expected {
             correct_simple += 1;
@@ -292,6 +301,14 @@ fn validate_noun_declension_guessing(data_path: &Path) {
         } else {
             *confusion_full
                 .entry((expected, guessed_full.as_i8()))
+                .or_insert(0) += 1;
+        }
+
+        if guessed_compound.as_i8() == expected {
+            correct_compound += 1;
+        } else {
+            *confusion_compound
+                .entry((expected, guessed_compound.as_i8()))
                 .or_insert(0) += 1;
         }
     }
@@ -309,6 +326,12 @@ fn validate_noun_declension_guessing(data_path: &Path) {
         total,
         100.0 * correct_full as f64 / total as f64
     );
+    println!(
+        "Compound guesser: {}/{} ({:.2}%)",
+        correct_compound,
+        total,
+        100.0 * correct_compound as f64 / total as f64
+    );
 
     println!("\nSimple guesser confusion matrix (expected→guessed, count):");
     let mut conf: Vec<_> = confusion_simple.iter().collect();
@@ -319,6 +342,13 @@ fn validate_noun_declension_guessing(data_path: &Path) {
 
     println!("\nFull guesser confusion matrix (expected→guessed, count):");
     let mut conf: Vec<_> = confusion_full.iter().collect();
+    conf.sort_by(|a, b| b.1.cmp(a.1));
+    for ((exp, got), count) in conf.iter().take(15) {
+        println!("  dec{}→dec{}: {}", exp, got, count);
+    }
+
+    println!("\nCompound guesser confusion matrix (expected→guessed, count):");
+    let mut conf: Vec<_> = confusion_compound.iter().collect();
     conf.sort_by(|a, b| b.1.cmp(a.1));
     for ((exp, got), count) in conf.iter().take(15) {
         println!("  dec{}→dec{}: {}", exp, got, count);
