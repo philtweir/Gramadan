@@ -11,6 +11,7 @@ use std::path::Path;
 
 use gramadan::features::Gender;
 use gramadan::noun;
+use gramadan::singular_info;
 use gramadan::verb;
 
 fn main() {
@@ -18,12 +19,14 @@ fn main() {
 
     let mut dump_guesses = false;
     let mut tearma_tsv: Option<String> = None;
+    let mut kaikki_tsv: Option<String> = None;
     let mut data_dir = "../data".to_string();
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--dump-guesses" => dump_guesses = true,
             "--tearma" => tearma_tsv = args.next(),
+            "--kaikki" => kaikki_tsv = args.next(),
             _ => data_dir = arg,
         }
     }
@@ -37,6 +40,11 @@ fn main() {
 
     if let Some(ref tsv_path) = tearma_tsv {
         validate_tearma(data_path, tsv_path);
+        return;
+    }
+
+    if let Some(ref tsv_path) = kaikki_tsv {
+        validate_kaikki(data_path, tsv_path);
         return;
     }
 
@@ -623,5 +631,186 @@ fn validate_tearma(data_path: &Path, tsv_path: &str) {
     conf.sort_by(|a, b| b.1.cmp(a.1));
     for ((exp, got), count) in conf.iter().take(10) {
         println!("  dec{}→dec{}: {}", exp, got, count);
+    }
+}
+
+// ---- Kaikki/Wiktionary validation ----
+
+/// Recognise declension from (lemma, gender, known_genitive) by trying
+/// each SingularInfo strategy and checking which produces the correct genitive.
+/// Order: 5th → 4th → 3rd → 2nd → 1st (matches Python NounDeclensionGuesser).
+/// Returns 0 if no strategy matches.
+fn recognise_declension(lemma: &str, gender: Gender, genitive: &str) -> i8 {
+    // 5th: various strategies
+    let fifth_checks: &[fn(&str, Gender) -> singular_info::SingularInfo] = &[
+        |l, g| singular_info::singular_info_l(l, g, ""),
+        |l, g| singular_info::singular_info_n(l, g),
+        |l, g| singular_info::singular_info_d(l, g),
+        |l, g| singular_info::singular_info_ax(l, g, true, ""),
+        |l, g| singular_info::singular_info_ax(l, g, false, ""),
+    ];
+    for check in fifth_checks {
+        let si = check(lemma, gender);
+        if si.genitive.first().map(|f| f.value.as_str()) == Some(genitive) {
+            // 5th only if the genitive actually differs from nom
+            // (otherwise 4th takes priority)
+            if lemma != genitive {
+                return 5;
+            }
+        }
+    }
+
+    // 4th: gen = nom
+    if lemma == genitive {
+        return 4;
+    }
+
+    // 3rd: SingularInfoA (broaden + -a)
+    let si = singular_info::singular_info_a(lemma, gender, false, "", true);
+    if si.genitive.first().map(|f| f.value.as_str()) == Some(genitive) {
+        return 3;
+    }
+
+    // 2nd: SingularInfoE (slenderize + -e) without syncope
+    let si = singular_info::singular_info_e(lemma, gender, false, false, "", true);
+    if si.genitive.first().map(|f| f.value.as_str()) == Some(genitive) {
+        return 2;
+    }
+    // 2nd: SingularInfoC for fem -ach → -aí
+    if gender == Gender::Fem {
+        let si = singular_info::singular_info_c(lemma, gender, "", false);
+        if si.genitive.first().map(|f| f.value.as_str()) == Some(genitive) {
+            return 2;
+        }
+    }
+    // 2nd: SingularInfoE with syncope
+    let si = singular_info::singular_info_e(lemma, gender, true, false, "", true);
+    if si.genitive.first().map(|f| f.value.as_str()) == Some(genitive) {
+        return 2;
+    }
+
+    // 1st: SingularInfoC (slenderize) — last, as it's the most greedy
+    let si = singular_info::singular_info_c(lemma, gender, "", true);
+    if si.genitive.first().map(|f| f.value.as_str()) == Some(genitive) {
+        return 1;
+    }
+
+    0 // unrecognised
+}
+
+/// Validate guessers against Kaikki/Wiktionary entries that have a known genitive.
+///
+/// Reads TSV: lemma\tgender\tgenitive
+/// Uses the genitive to recognise the "true" declension, then compares guessers.
+fn validate_kaikki(data_path: &Path, tsv_path: &str) {
+    println!("=== Kaikki/Wiktionary Novel Noun Validation ===\n");
+
+    // Build LemmaDb from BuNaMo
+    let noun_dir = data_path.join("noun");
+    let entries: Vec<_> = fs::read_dir(&noun_dir)
+        .expect("Cannot read noun directory")
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "xml"))
+        .collect();
+
+    let mut db = noun::LemmaDb::new();
+    for entry in &entries {
+        if let Some(n) = parse_noun_xml(&entry.path()) {
+            if n.declension >= 1 && n.declension <= 5 {
+                db.insert(n.lemma.clone(), n.declension, n.gender);
+            }
+        }
+    }
+    println!("LemmaDb: {} entries from BuNaMo\n", db.len());
+
+    let content = fs::read_to_string(tsv_path).expect("Cannot read Kaikki TSV");
+
+    let mut total = 0;
+    let mut recognised = 0;
+    let mut unrecognised = 0;
+    let mut correct_simple = 0;
+    let mut correct_compound = 0;
+    let mut gen_nom_equal = 0;
+    let mut confusion_simple: HashMap<(i8, i8), usize> = HashMap::new();
+    let mut confusion_compound: HashMap<(i8, i8), usize> = HashMap::new();
+    let mut unrec_examples: Vec<(String, String, String)> = Vec::new();
+
+    for line in content.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() < 3 { continue; }
+
+        let lemma = parts[0];
+        let gender = match parts[1] {
+            "masc" => Gender::Masc,
+            "fem" => Gender::Fem,
+            _ => continue,
+        };
+        let genitive = parts[2];
+
+        total += 1;
+
+        if lemma == genitive {
+            gen_nom_equal += 1;
+        }
+
+        let expected = recognise_declension(lemma, gender, genitive);
+        if expected == 0 {
+            unrecognised += 1;
+            if unrec_examples.len() < 30 {
+                unrec_examples.push((lemma.to_string(), genitive.to_string(),
+                    if gender == Gender::Masc { "masc" } else { "fem" }.to_string()));
+            }
+            continue;
+        }
+        recognised += 1;
+
+        let simple = noun::guess_declension(lemma, gender);
+        let compound = noun::guess_declension_compound(lemma, gender, &db);
+
+        if simple.as_i8() == expected {
+            correct_simple += 1;
+        } else {
+            *confusion_simple.entry((expected, simple.as_i8())).or_insert(0) += 1;
+        }
+
+        if compound.as_i8() == expected {
+            correct_compound += 1;
+        } else {
+            *confusion_compound.entry((expected, compound.as_i8())).or_insert(0) += 1;
+        }
+    }
+
+    println!("Total entries: {}", total);
+    println!("  gen = nom: {}", gen_nom_equal);
+    println!("  Recognised declension: {}", recognised);
+    println!("  Unrecognised (no strategy matched): {}", unrecognised);
+    println!(
+        "\nSimple guesser:   {}/{} ({:.2}%)",
+        correct_simple, recognised, 100.0 * correct_simple as f64 / recognised as f64
+    );
+    println!(
+        "Compound guesser: {}/{} ({:.2}%)",
+        correct_compound, recognised, 100.0 * correct_compound as f64 / recognised as f64
+    );
+
+    println!("\nSimple confusion (expected→guessed):");
+    let mut conf: Vec<_> = confusion_simple.iter().collect();
+    conf.sort_by(|a, b| b.1.cmp(a.1));
+    for ((exp, got), count) in conf.iter().take(10) {
+        println!("  dec{}→dec{}: {}", exp, got, count);
+    }
+
+    println!("\nCompound confusion (expected→guessed):");
+    let mut conf: Vec<_> = confusion_compound.iter().collect();
+    conf.sort_by(|a, b| b.1.cmp(a.1));
+    for ((exp, got), count) in conf.iter().take(10) {
+        println!("  dec{}→dec{}: {}", exp, got, count);
+    }
+
+    if !unrec_examples.is_empty() {
+        println!("\nUnrecognised examples (genitive doesn't match any strategy):");
+        for (lemma, gen, gender) in &unrec_examples {
+            println!("  {} ({}): gen={}", lemma, gender, gen);
+        }
     }
 }
