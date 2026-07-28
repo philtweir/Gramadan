@@ -35,9 +35,39 @@ Each result carries a `Method` enum so the caller can audit/log what resolved it
 | Verbs lemma-only (3,359) | 94.55% | |
 | Verbs future-based (3,359) | 100% | |
 
-**Full Téarma pipeline estimated accuracy: 99.7%** when BuNaMo is pre-loaded.
-Only ~200 words (0.4%) hit the morphological guesser; the rest are covered by
-records, stated classes, or high-confidence heuristics.
+**Two metrics — keep them apart (the earlier "99.7%" conflated them).** The
+cross-validation table above is *engine accuracy on specific sets*, NOT pipeline
+coverage. Measured on the real Téarma corpus at wiring time (Gréasán session):
+
+- **Pipeline accuracy** over all Téarma nouns is high but *dominated by the ~33k
+  that already have a stated class* — it says almost nothing about the enrichment.
+- **Enrichment on the CLASSLESS subset** (the metric that actually matters):
+  - **~29,254 classless** entries — 22,884 nouns + 6,370 verbs (Téarma never
+    tags verb class).
+  - Guesser resolves **79.7%** (empty DB) → **79.8%** with BuNaMo preloaded. The
+    ~20% Unresolved are no-gender, multi-word, or plural-only entries. Resolved
+    accuracy is ~89% (per the table).
+
+**BuNaMo preload is a CONFIDENCE upgrade, not a coverage or (naïve) accuracy
+win.** It moves coverage by **+18**. Of the ~1,104 overlap entries (BuNaMo
+attests AND the guesser also answered) the two disagree **92.6%** — but that is
+NOT 92.6% of guesses being wrong. Almost every disagreement is BuNaMo returning
+**declension 0** (which the binding was mapping to `"irr"`) on **verbal nouns**,
+against the guesser's sensible `-ú → 4th` / `-adh → 1st`:
+
+- Genuine BuNaMo wins are **common nouns** (`bealach`→1, `carraig`→2) — ~1,122
+  exact `DbLookup` hits → *attested* confidence.
+- The "92.6% correction" is a **declension-0 / verbal-noun modelling clash**, not
+  real corrections; mapping `0 → irr` is misleading (a productive `-ú` verbal
+  noun is not irregular like `bean`).
+
+**Declension-0 handling — fix before trusting the preload.** Don't let BuNaMo's
+`declension 0` override the verbal-noun heuristics. `-adh/-eadh → 1st` is
+validated at **98.1%** (104/106 BuNaMo `-adh/-eadh` nouns are 1st; the two
+exceptions `conradh`/`feadh` are standalone, already in the irregular list).
+Options: (a) skip `DbLookup` when BuNaMo=0, fall back to the heuristic; (b) keep
+0 but label it truthfully (verbal-noun / no-class), not `"irr"`; (c) trust
+BuNaMo only for declensions 1–5.
 
 **Key data findings from this session:**
 
