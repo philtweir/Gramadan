@@ -412,6 +412,25 @@ const FULLY_IRREGULAR: &[(&str, (i8, &str))] = &[
     ("namhaid", (5, "namhad")),
     ("bráid", (5, "brád")),
     ("Nollaig", (5, "Nollag")),
+    // Téarma classless words where the guesser gets the wrong declension —
+    // verified against BuNaMo XML and Kaikki genitives. These 16 entries
+    // capture the entire accuracy gain that BuNaMo/Kaikki lookup would
+    // provide on the classless Téarma subset.
+    ("ab", (3, "aba")),
+    ("ac", (4, "ac")),
+    ("aip", (2, "aipe")),
+    ("ar", (1, "air")),
+    ("boilg", (2, "boilge")),
+    ("scríobh", (3, "scríofa")),
+    ("anas", (1, "anais")),
+    ("bar", (1, "bair")),
+    ("cat", (1, "cait")),
+    ("col", (1, "coil")),
+    ("fás", (1, "fáis")),
+    ("gal", (1, "gail")),
+    ("salm", (1, "sailm")),
+    ("solas", (1, "solais")),
+    ("teastas", (1, "teastais")),
 ];
 
 /// Words in the "Irregular Declension" (6th declension category).

@@ -100,22 +100,23 @@ In `Gréasán/app/src-tauri/Cargo.toml`:
 gramadan = { path = "../../../Gramadan/gramadan-rs" }
 ```
 
-### 1b. Build LemmaDb from BuNaMo
+### 1b. LemmaDb — optional, not required
 
-BuNaMo is loaded as a separate layer (`bunamo-v2`). At the point where
-Téarma is built, BuNaMo may or may not already be available on-device.
+The `enrich_grammar_class()` API takes a `&LemmaDb` for compound
+decomposition (matching compound heads against known words). However,
+analysis showed that BuNaMo/Kaikki lookup only corrects **16 words** on
+the classless Téarma subset — and all 16 are now baked into the
+`FULLY_IRREGULAR` exception list in `noun.rs`. So the LemmaDb is
+**not required for accuracy**.
 
-**Option A (preferred):** Ship a pre-compiled LemmaDb as a small binary blob
-(~200KB for 12k entries) inside the core bundle. Generate it from BuNaMo XML
-at CI time. Load it in `builder_plugin.rs` before the TBX parse.
+**Pass `LemmaDb::new()` (empty).** The guesser works at 93%+ from
+morphological rules + exception lists alone. Compound decomposition
+(which needs the LemmaDb) adds ~1% on BuNaMo but its value on Téarma
+is marginal since most Téarma compounds are verbal nouns handled by
+the `-adh→1st` / `-ú→4th` heuristics.
 
-**Option B:** If BuNaMo layer is guaranteed to be loaded first, read its
-`head.sqlite` to build the LemmaDb at runtime. The spine + concept_tags
-tables have what's needed.
-
-**Option C (minimum viable):** Pass an empty `LemmaDb::new()`. The guesser
-still works at 92% from morphological rules alone; compound decomposition
-just won't fire. This is a valid starting point.
+If you later want compound decomposition for non-Téarma use cases (e.g.
+user-entered words), populate the LemmaDb from BuNaMo at layer load time.
 
 ### 1c. Enrich records
 
@@ -175,34 +176,46 @@ The Python path in `Gréasán/src/goidelic/run.py` runs `run_tbx_pipeline()`:
 tbx.py → ontolex.py → arches.py. The enrichment step goes between tbx and
 ontolex.
 
-Two options:
+**PyO3 bindings exist** (`src/python.rs`, gated behind `features = ["python"]`).
+The Cargo.toml already has `crate-type = ["rlib", "cdylib"]` and optional
+`pyo3` dependency. Build with maturin:
 
-**Option A (call Rust from Python via PyO3):** Build gramadan-rs as a Python
-extension module. This keeps one implementation. Requires adding PyO3
-bindings — not done yet but straightforward given the simple API surface.
+```bash
+cd gramadan-rs && maturin develop --features python
+```
 
-**Option B (pure Python):** The Python v2 code in `gramadan/v2/` already has
-the guesser classes. Call `NualeargaisNounDeclensionGuesser` directly in the
-pipeline. This won't have the compound decomposition improvements but covers
-the basics. The heuristics (vowel→4th, VN→1st) can be added as a few lines
-of Python.
+Then in the Python pipeline:
 
-Option A is cleaner long-term; Option B is faster to ship.
+```python
+import gramadan_rs
+result = gramadan_rs.enrich(word, pos, gender, grammar_class)
+# result.grammar_class, result.method
+```
+
+An empty LemmaDb is sufficient (see §1b). The 16 exception words are baked
+into the Rust code; no external data needed.
 
 ---
 
 ## 3. Scope guardrails
 
-- **BuNaMo first.** Where a lemma exists in BuNaMo, its grammar_class is
-  exact — use the LemmaDb lookup, don't guess.
 - **Don't override stated classes.** If Téarma already has `grammar_class`
-  from `extract_declension()`, keep it.
+  from `extract_declension()`, keep it. The `enrich_grammar_class` API
+  already handles this (returns `AlreadyStated` when `grammar_class` is
+  non-empty).
 - **Don't force a class on plural-only entries** (`iol`/`pl`/`fir iol`),
   abbreviations (`gior`/`abr`), or collectives (`cnuas`). The handoff from
   the previous session has the breakdown (16.3% of Téarma nouns lack a class;
   only ~10% are the recoverable bare `fir`/`bain` gap).
 - **Verbs:** Téarma tags verbs only `br`/`v` (no class). The lemma-only
   heuristic is 94.6% accurate. Ship it.
+- **BuNaMo LemmaDb is optional.** The 16 words where BuNaMo/Kaikki would
+  have corrected the guesser are now in the `FULLY_IRREGULAR` exception
+  list. An empty `LemmaDb::new()` is sufficient for the Téarma pipeline.
+- **BuNaMo declension 0.** If you do load BuNaMo into the LemmaDb, skip
+  entries with `declension=0`. These are mostly verbal nouns that BuNaMo
+  didn't classify; the heuristics (`-adh→1st`, `-ú→4th`) are more useful
+  than an `"irr"` label. Trust BuNaMo only for declensions 1–5.
 - **`Method` audit trail:** Log or store which strategy resolved each word.
   The ~200 words hitting `MorphologicalGuesser` are the ones most likely to
   be wrong.
@@ -229,14 +242,15 @@ Option A is cleaner long-term; Option B is faster to ship.
 
 ## 5. Follow-ups (not blocking)
 
-- **PyO3/WASM bindings** for gramadan-rs — needed for Python path (Option A)
-  and for browser-side on-demand declension in the word view.
+- **PyO3 bindings exist** (`src/python.rs`) but may need extending if the
+  Gréasán Python pipeline wants batch mode or LemmaDb population from Python.
+- **WASM bindings** — not yet built. Needed for browser-side on-demand
+  declension in the word view.
 - **Fix Kaikki gender pipeline loss** — 14k nouns have gender in the Kaikki
-  dump but it's dropped before reaching the graph. `normalise.py` maps the
-  tags correctly; the issue is likely in how the graph import handles
-  entry-level vs form-level features.
-- **Pre-compiled LemmaDb blob** — generate at CI, ship in core bundle, avoid
-  needing BuNaMo layer loaded before Téarma build.
+  dump but it's dropped before reaching the Gréasán graph. `normalise.py`
+  maps the tags correctly; the issue is likely in how the graph import
+  handles entry-level vs form-level features. Not blocking for Téarma
+  enrichment but would improve Wiktionary layer quality.
 - **Adjective declension** — not implemented in gramadan-rs yet. Adjectives
   reuse `SingularInfo` classes (simpler than nouns). Téarma has `a1`..`a3`.
 - **On-demand paradigm generation** — the `singular_info` and `plural_info`
