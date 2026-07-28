@@ -203,44 +203,60 @@ impl LemmaDb {
         self.entries.is_empty()
     }
 
-    /// Find the compound head of a word: the longest known suffix,
-    /// including demutating the join point to undo lenition.
+    /// Find the compound head of a word.
     ///
-    /// Only returns matches where the head word's gender matches
-    /// `required_gender`, since Irish compounds inherit the head's gender.
-    /// Requires the head to be at least 3 chars to avoid spurious matches.
-    /// Find compound head by looking for lenition at an internal boundary.
+    /// Three strategies, in order of reliability:
+    /// 1. **Hyphen split**: `ard-deoch` → `deoch`
+    /// 2. **Lenition detection**: `aolchloch` → `cloch` (demutate at join)
+    /// 3. **Direct suffix**: `buntarraingt` → `tarraingt` (for long known
+    ///    heads where the join doesn't trigger lenition)
     ///
-    /// Scans for internal lenited consonants (`ch`, `bh`, `fh`, etc.) — a
-    /// strong structural signal that the word is a compound. At each such
-    /// point, demutates and checks if the result is a known lemma with
-    /// matching gender. Also requires the prefix (the part before the
-    /// lenited join) to be a known word, to avoid false matches on words
-    /// like `droichead` where `ch` is part of the root, not a join.
-    ///
+    /// All strategies require the head's gender to match `required_gender`.
     /// Returns the longest matching head's declension.
     pub fn find_compound_head(&self, lemma: &str, required_gender: Gender) -> Option<i8> {
         let mut best: Option<(i8, usize)> = None; // (declension, head_len)
 
+        // Strategy 1: hyphen split — most reliable signal
+        if let Some(hyphen_pos) = lemma.rfind('-') {
+            let tail = &lemma[hyphen_pos + 1..];
+            if tail.len() >= 3 {
+                // Try direct match
+                if let Some(&(dec, gender)) = self.entries.get(tail) {
+                    if gender == required_gender {
+                        return Some(dec);
+                    }
+                }
+                // Try demutating after hyphen
+                for &(mutated, original) in DEMUT_PAIRS {
+                    if tail.starts_with(mutated) {
+                        let candidate = format!("{}{}", original, &tail[mutated.len()..]);
+                        if let Some(&(dec, gender)) = self.entries.get(candidate.as_str()) {
+                            if gender == required_gender {
+                                return Some(dec);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let chars: Vec<(usize, char)> = lemma.char_indices().collect();
 
+        // Strategy 2: lenition detection
         for ci in 1..chars.len() {
             let (byte_pos, _) = chars[ci];
             let prefix = &lemma[..byte_pos];
 
-            // Prefix must be at least 3 chars to avoid trivial splits.
             if prefix.len() < 3 {
                 continue;
             }
 
             let tail = &lemma[byte_pos..];
 
-            // Check each lenition pair at this position
             for &(mutated, original) in DEMUT_PAIRS {
                 if tail.starts_with(mutated) {
                     let candidate = format!("{}{}", original, &tail[mutated.len()..]);
                     // Head must be >= 5 chars to avoid spurious short matches
-                    // like cead, meas, teas which appear naturally in roots.
                     if candidate.len() >= 5
                         && candidate != lemma
                         && !COMPOUND_HEAD_BLACKLIST.contains(&candidate.as_str())
@@ -252,6 +268,33 @@ impl LemmaDb {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        if best.is_some() {
+            return best.map(|(dec, _)| dec);
+        }
+
+        // Strategy 3: direct suffix match for long known heads (>= 7 chars).
+        // Catches compounds without lenition like bun+tarraingt, bog+scrios.
+        // High min length avoids false matches on short common suffixes.
+        for ci in 1..chars.len() {
+            let (byte_pos, _) = chars[ci];
+            let prefix = &lemma[..byte_pos];
+            let tail = &lemma[byte_pos..];
+
+            if prefix.len() < 2 || tail.len() < 7 || tail == lemma {
+                continue;
+            }
+
+            if let Some(&(dec, gender)) = self.entries.get(tail) {
+                if gender == required_gender
+                    && !COMPOUND_HEAD_BLACKLIST.contains(&tail)
+                {
+                    if best.is_none() || tail.len() > best.unwrap().1 {
+                        best = Some((dec, tail.len()));
                     }
                 }
             }
