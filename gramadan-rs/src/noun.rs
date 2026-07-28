@@ -203,6 +203,16 @@ impl LemmaDb {
         self.entries.is_empty()
     }
 
+    /// Look up a lemma's declension directly.
+    pub fn lookup(&self, lemma: &str) -> Option<i8> {
+        self.entries.get(lemma).map(|(dec, _)| *dec)
+    }
+
+    /// Look up a lemma's declension and gender.
+    pub fn lookup_full(&self, lemma: &str) -> Option<(i8, Gender)> {
+        self.entries.get(lemma).copied()
+    }
+
     /// Find the compound head of a word.
     ///
     /// Three strategies, in order of reliability:
