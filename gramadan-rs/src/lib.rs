@@ -5,3 +5,6 @@ pub mod plural_info;
 pub mod noun;
 pub mod verb;
 pub mod enrich;
+
+#[cfg(feature = "python")]
+mod python;

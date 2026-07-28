@@ -1,0 +1,16 @@
+[build-system]
+requires = ["maturin>=1.5,<2"]
+build-backend = "maturin"
+
+[project]
+name = "gramadan-rs"
+version = "0.1.0"
+description = "PyO3 bindings for the gramadan Irish morphology engine (grammar_class enrichment)"
+requires-python = ">=3.9"
+classifiers = ["Programming Language :: Rust"]
+
+[tool.maturin]
+# The PyO3 extension module is `gramadan_rs` (the #[pymodule] fn); the Rust lib
+# crate is `gramadan`. `features = ["python"]` makes maturin build with pyo3.
+module-name = "gramadan_rs"
+features = ["python"]
