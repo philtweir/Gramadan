@@ -444,9 +444,16 @@ fn is_fourth_simple(lemma: &str, gender: Gender) -> bool {
         }
     }
 
-    if gender == Gender::Fem && re_ends(lemma, &["[eí]"]) {
-        return true;
+    // Fem vowel-ending → 4th (97% of fem vowel-ending nouns in BuNaMo are 4th;
+    // the few 5th-decl exceptions like caora, pearsa are already guessed wrong as 3rd)
+    if gender == Gender::Fem {
+        if let Some(last) = lemma.chars().last() {
+            if opers::VOWELS.contains(last) {
+                return true;
+            }
+        }
     }
+
     if gender == Gender::Masc && re_ends(lemma, &[&format!("[{}]", opers::VOWELS), "ín"]) {
         return true;
     }
