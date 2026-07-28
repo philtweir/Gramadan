@@ -17,13 +17,14 @@ fn main() {
     let mut args = std::env::args().skip(1).peekable();
 
     let mut dump_guesses = false;
+    let mut tearma_tsv: Option<String> = None;
     let mut data_dir = "../data".to_string();
 
     while let Some(arg) = args.next() {
-        if arg == "--dump-guesses" {
-            dump_guesses = true;
-        } else {
-            data_dir = arg;
+        match arg.as_str() {
+            "--dump-guesses" => dump_guesses = true,
+            "--tearma" => tearma_tsv = args.next(),
+            _ => data_dir = arg,
         }
     }
 
@@ -31,6 +32,11 @@ fn main() {
 
     if dump_guesses {
         dump_noun_guesses(data_path);
+        return;
+    }
+
+    if let Some(ref tsv_path) = tearma_tsv {
+        validate_tearma(data_path, tsv_path);
         return;
     }
 
@@ -508,5 +514,114 @@ fn validate_verb_conjugation(data_path: &Path) {
         for ((exp, got), count) in conf.iter().take(10) {
             println!("  {}→{}: {}", exp, got, count);
         }
+    }
+}
+
+// ---- Téarma validation ----
+
+/// Validate the guesser against Téarma nouns.
+///
+/// Reads a TSV file with: lemma\tclass\tgender
+/// Builds a LemmaDb from BuNaMo, then runs all three guessers.
+fn validate_tearma(data_path: &Path, tsv_path: &str) {
+    println!("=== Téarma Noun Declension Validation ===\n");
+
+    // Build LemmaDb from BuNaMo
+    let noun_dir = data_path.join("noun");
+    let entries: Vec<_> = fs::read_dir(&noun_dir)
+        .expect("Cannot read noun directory")
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "xml"))
+        .collect();
+
+    let mut db = noun::LemmaDb::new();
+    for entry in &entries {
+        if let Some(n) = parse_noun_xml(&entry.path()) {
+            if n.declension >= 1 && n.declension <= 5 {
+                db.insert(n.lemma.clone(), n.declension, n.gender);
+            }
+        }
+    }
+    println!("LemmaDb: {} entries from BuNaMo", db.len());
+
+    // Read Téarma TSV
+    let content = fs::read_to_string(tsv_path).expect("Cannot read Téarma TSV");
+    let mut total = 0;
+    let mut correct_simple = 0;
+    let mut correct_compound = 0;
+    let mut confusion_simple: HashMap<(i8, i8), usize> = HashMap::new();
+    let mut confusion_compound: HashMap<(i8, i8), usize> = HashMap::new();
+    let mut compound_changed = 0;
+    let mut compound_fixed = 0;
+    let mut compound_broke = 0;
+
+    for line in content.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() < 3 { continue; }
+
+        let lemma = parts[0];
+        let expected: i8 = match parts[1].parse() {
+            Ok(v) if v >= 1 && v <= 5 => v,
+            _ => continue,
+        };
+        let gender = match parts[2] {
+            "masc" => Gender::Masc,
+            "fem" => Gender::Fem,
+            _ => continue,
+        };
+
+        total += 1;
+
+        let simple = noun::guess_declension(lemma, gender);
+        let compound = noun::guess_declension_compound(lemma, gender, &db);
+
+        if simple.as_i8() == expected {
+            correct_simple += 1;
+        } else {
+            *confusion_simple.entry((expected, simple.as_i8())).or_insert(0) += 1;
+        }
+
+        if compound.as_i8() == expected {
+            correct_compound += 1;
+        } else {
+            *confusion_compound.entry((expected, compound.as_i8())).or_insert(0) += 1;
+        }
+
+        if compound.as_i8() != simple.as_i8() {
+            compound_changed += 1;
+            if compound.as_i8() == expected {
+                compound_fixed += 1;
+            } else if simple.as_i8() == expected {
+                compound_broke += 1;
+            }
+        }
+    }
+
+    println!("Total Téarma nouns with class 1-5: {}", total);
+    println!(
+        "Simple guesser:   {}/{} ({:.2}%)",
+        correct_simple, total, 100.0 * correct_simple as f64 / total as f64
+    );
+    println!(
+        "Compound guesser: {}/{} ({:.2}%)",
+        correct_compound, total, 100.0 * correct_compound as f64 / total as f64
+    );
+    println!(
+        "\nCompound decomposition impact: {} changed, {} fixed, {} broke",
+        compound_changed, compound_fixed, compound_broke
+    );
+
+    println!("\nSimple guesser confusion (expected→guessed):");
+    let mut conf: Vec<_> = confusion_simple.iter().collect();
+    conf.sort_by(|a, b| b.1.cmp(a.1));
+    for ((exp, got), count) in conf.iter().take(10) {
+        println!("  dec{}→dec{}: {}", exp, got, count);
+    }
+
+    println!("\nCompound guesser confusion (expected→guessed):");
+    let mut conf: Vec<_> = confusion_compound.iter().collect();
+    conf.sort_by(|a, b| b.1.cmp(a.1));
+    for ((exp, got), count) in conf.iter().take(10) {
+        println!("  dec{}→dec{}: {}", exp, got, count);
     }
 }
