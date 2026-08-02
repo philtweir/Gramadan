@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::features::{Form, FormPlGen, FormSg, Gender};
 use crate::opers;
-use crate::plural_info::PluralInfo;
+use crate::plural_info::{self, PluralInfo};
 use crate::singular_info::{self, SingularInfo};
 
 use regex::Regex;
@@ -817,37 +817,56 @@ fn is_fifth_full(lemma: &str, gender: Gender) -> bool {
 // Genitive generation — strategy selection per declension
 // ============================================================
 
-/// Generate the genitive form for a noun given lemma, gender, and declension.
+/// Build the full singular paradigm (nom/gen/voc/dat) for a noun.
 ///
-/// Uses the appropriate SingularInfo strategy (or FULLY_IRREGULAR lookup)
-/// to produce the genitive. Returns None for unknown declensions.
-pub fn generate_genitive(lemma: &str, gender: Gender, declension: i8) -> Option<String> {
-    // FULLY_IRREGULAR overrides everything
-    if let Some((dec, gen)) = lookup_fully_irregular(lemma) {
-        if dec == declension {
-            return Some(gen.to_string());
-        }
-    }
-
-    // IRREGULAR_DECLENSION — these have known genitives
+/// Dispatches to the appropriate SingularInfo strategy per declension,
+/// with overrides for FULLY_IRREGULAR and IRREGULAR_DECLENSION words.
+pub fn singular_paradigm(lemma: &str, gender: Gender, declension: i8) -> Option<SingularInfo> {
+    // IRREGULAR_DECLENSION — deeply irregular, only genitive is known
     for &(l, gen) in IRREGULAR_DECLENSION_BASE {
         if l == lemma {
-            return Some(gen.to_string());
+            let si = SingularInfo {
+                gender,
+                nominative: vec![Form::new(lemma)],
+                genitive: vec![Form::new(gen)],
+                vocative: vec![Form::new(lemma)],
+                dative: vec![Form::new(lemma)],
+            };
+            return Some(si);
         }
     }
 
+    // FULLY_IRREGULAR — use standard strategy for voc/dat, override genitive
+    if let Some((dec, gen)) = lookup_fully_irregular(lemma) {
+        if dec == declension {
+            let mut si = singular_paradigm_for_declension(lemma, gender, declension)
+                .unwrap_or_else(|| singular_info::singular_info_o(lemma, gender));
+            si.genitive = vec![Form::new(gen)];
+            return Some(si);
+        }
+    }
+
+    singular_paradigm_for_declension(lemma, gender, declension)
+}
+
+fn singular_paradigm_for_declension(lemma: &str, gender: Gender, declension: i8) -> Option<SingularInfo> {
     match declension {
-        1 => Some(generate_genitive_1st(lemma, gender)),
-        2 => Some(generate_genitive_2nd(lemma, gender)),
-        3 => Some(generate_genitive_3rd(lemma, gender)),
-        4 => Some(generate_genitive_4th(lemma, gender)),
-        5 => Some(generate_genitive_5th(lemma, gender)),
+        1 => Some(singular_paradigm_1st(lemma, gender)),
+        2 => Some(singular_paradigm_2nd(lemma, gender)),
+        3 => Some(singular_paradigm_3rd(lemma, gender)),
+        4 => Some(singular_paradigm_4th(lemma, gender)),
+        5 => Some(singular_paradigm_5th(lemma, gender)),
         _ => None,
     }
 }
 
-/// 1st declension: SingularInfoC with optional irregular targets and with_iai control.
-fn generate_genitive_1st(lemma: &str, gender: Gender) -> String {
+/// Generate the genitive form for a noun given lemma, gender, and declension.
+pub fn generate_genitive(lemma: &str, gender: Gender, declension: i8) -> Option<String> {
+    singular_paradigm(lemma, gender, declension)
+        .and_then(|si| si.genitive.first().map(|f| f.value.clone()))
+}
+
+fn singular_paradigm_1st(lemma: &str, gender: Gender) -> SingularInfo {
     let target = IRREGULARLY_PALATALIZED_1ST.iter()
         .find(|(l, _)| *l == lemma)
         .map(|(_, t)| *t)
@@ -855,15 +874,10 @@ fn generate_genitive_1st(lemma: &str, gender: Gender) -> String {
 
     let with_iai = !in_list(lemma, WITHOUT_IAI);
 
-    let si = singular_info::singular_info_c(lemma, gender, target, with_iai);
-    si.genitive.first().map(|f| f.value.clone()).unwrap_or_else(|| lemma.to_string())
+    singular_info::singular_info_c(lemma, gender, target, with_iai)
 }
 
-/// 2nd declension: SingularInfoE by default, SingularInfoC for polysyllabic fem -ach/-each.
-///
-/// Monosyllabic -ach words (cuach, beach, creach, etc.) use SingularInfoE (gen: -aiche/-eiche).
-/// Polysyllabic -ach words (bolgach, óinseach, etc.) use SingularInfoC (gen: -aí/-í).
-fn generate_genitive_2nd(lemma: &str, gender: Gender) -> String {
+fn singular_paradigm_2nd(lemma: &str, gender: Gender) -> SingularInfo {
     let ei_target = if in_list(lemma, POLYSYLLABIC_EI_2ND) {
         "ei"
     } else {
@@ -872,78 +886,46 @@ fn generate_genitive_2nd(lemma: &str, gender: Gender) -> String {
 
     let use_mono_ei = !in_list(lemma, MONOSYLLABIC_I_2ND);
 
-    // Polysyllabic fem -ach/-each: use SingularInfoC (ch→gh, slenderize, fem -igh→-í)
     if gender == Gender::Fem
         && (lemma.ends_with("ach") || lemma.ends_with("each"))
         && opers::polysyllabic(lemma)
     {
-        let si = singular_info::singular_info_c(lemma, gender, ei_target, false);
-        return si.genitive.first().map(|f| f.value.clone()).unwrap_or_else(|| lemma.to_string());
+        return singular_info::singular_info_c(lemma, gender, ei_target, false);
     }
 
-    // Default: SingularInfoE without syncope
-    let si = singular_info::singular_info_e(lemma, gender, false, false, ei_target, use_mono_ei);
-    si.genitive.first().map(|f| f.value.clone()).unwrap_or_else(|| lemma.to_string())
+    singular_info::singular_info_e(lemma, gender, false, false, ei_target, use_mono_ei)
 }
 
-/// 3rd declension: SingularInfoA with conditional auto-syncope.
-fn generate_genitive_3rd(lemma: &str, gender: Gender) -> String {
+fn singular_paradigm_3rd(lemma: &str, gender: Gender) -> SingularInfo {
     let with_syncopated_ai = !in_list(lemma, UNSYNCOPATED_3RD);
 
-    let si = singular_info::singular_info_a(lemma, gender, false, "", with_syncopated_ai);
-    si.genitive.first().map(|f| f.value.clone()).unwrap_or_else(|| lemma.to_string())
+    singular_info::singular_info_a(lemma, gender, false, "", with_syncopated_ai)
 }
 
-/// 4th declension: gen = nom.
-///
-/// Some masc -ú nouns in BuNaMo have gen≠nom (verbal nouns, arguably 2nd decl behaviour),
-/// but the standard 4th declension rule is gen=nom. BuNaMo composition provides the
-/// exact paradigm for those cases; this generator handles the remaining ones.
-fn generate_genitive_4th(lemma: &str, _gender: Gender) -> String {
-    lemma.to_string()
+fn singular_paradigm_4th(lemma: &str, gender: Gender) -> SingularInfo {
+    singular_info::singular_info_o(lemma, gender)
 }
 
-/// 5th declension: branch on gender + ending.
-/// Fem consonant (r/l/n): SingularInfoAX or EAX
-/// Fem vowel: SingularInfoN
-/// Masc vowel: SingularInfoD
-/// Otherwise: SingularInfoL (broaden)
-fn generate_genitive_5th(lemma: &str, gender: Gender) -> String {
-    let last_char = match lemma.chars().last() {
-        Some(c) => c,
-        None => return lemma.to_string(),
-    };
+fn singular_paradigm_5th(lemma: &str, gender: Gender) -> SingularInfo {
+    let last_char = lemma.chars().last().unwrap_or('a');
 
     if gender == Gender::Fem {
         if matches!(last_char, 'r' | 'l' | 'n') {
-            // Fem consonant-ending: use heuristics to pick AX vs EAX
-            return generate_genitive_5th_fem_consonant(lemma, gender);
+            return singular_paradigm_5th_fem_consonant(lemma, gender);
         }
         if opers::VOWELS.contains(last_char) {
-            // Fem vowel-ending: append -n/-an
-            let si = singular_info::singular_info_n(lemma, gender);
-            return si.genitive.first().map(|f| f.value.clone()).unwrap_or_else(|| lemma.to_string());
+            return singular_info::singular_info_n(lemma, gender);
         }
     }
 
     if gender == Gender::Masc && opers::VOWELS.contains(last_char) {
-        // Masc vowel-ending: append -d/-ad
-        let si = singular_info::singular_info_d(lemma, gender);
-        return si.genitive.first().map(|f| f.value.clone()).unwrap_or_else(|| lemma.to_string());
+        return singular_info::singular_info_d(lemma, gender);
     }
 
-    // Default: broaden
-    let si = singular_info::singular_info_l(lemma, gender, "");
-    si.genitive.first().map(|f| f.value.clone()).unwrap_or_else(|| lemma.to_string())
+    singular_info::singular_info_l(lemma, gender, "")
 }
 
-/// 5th declension fem nouns ending in r/l/n: pick between AX (broaden+-ach),
-/// EAX (slenderize+-each), and L (plain broadening).
-///
-/// Heuristics ported from the Python `_is_fifth` in noun_declensions.py.
-fn generate_genitive_5th_fem_consonant(lemma: &str, gender: Gender) -> String {
-    // Endings that indicate AX/EAX with syncope (polysyllabic words with
-    // specific patterns from Python lines 571-573)
+fn singular_paradigm_5th_fem_consonant(lemma: &str, gender: Gender) -> SingularInfo {
     let ax_word_endings = [
         "thir", "mhir", "eoir", "athair", "ochair", "bhair", "eorainn",
     ];
@@ -954,15 +936,11 @@ fn generate_genitive_5th_fem_consonant(lemma: &str, gender: Gender) -> String {
 
     if has_ax_ending || has_ax_pattern {
         let do_syncope = opers::polysyllabic(lemma);
-        let si = singular_info::singular_info_ax(lemma, gender, do_syncope, "");
-        return si.genitive.first().map(|f| f.value.clone()).unwrap_or_else(|| lemma.to_string());
+        return singular_info::singular_info_ax(lemma, gender, do_syncope, "");
     }
 
-    // Endings that indicate plain broadening (SingularInfoL) — from Python lines 576-579.
-    // These are words where the penultimate vowel is long/specific.
     let broadening_endings = ["eoil", "coil", "ain", "ill"];
 
-    // Check penultimate vowel cluster for patterns that prefer L
     let before_last: String = {
         let chars: Vec<char> = lemma.chars().collect();
         if chars.len() >= 2 {
@@ -977,15 +955,145 @@ fn generate_genitive_5th_fem_consonant(lemma: &str, gender: Gender) -> String {
     let has_broadening_vowel = broadening_vowel_patterns.iter().any(|p| before_last.ends_with(p));
 
     if has_broadening_ending || has_broadening_vowel {
-        let si = singular_info::singular_info_l(lemma, gender, "");
-        return si.genitive.first().map(|f| f.value.clone()).unwrap_or_else(|| lemma.to_string());
+        return singular_info::singular_info_l(lemma, gender, "");
     }
 
-    // Default for fem r/l/n: AX (majority case per Python line 581)
-    // Use syncope only for polysyllabic words to avoid mangling short words
     let do_syncope = opers::polysyllabic(lemma);
-    let si = singular_info::singular_info_ax(lemma, gender, do_syncope, "");
-    si.genitive.first().map(|f| f.value.clone()).unwrap_or_else(|| lemma.to_string())
+    singular_info::singular_info_ax(lemma, gender, do_syncope, "")
+}
+
+// ============================================================
+// Plural paradigm generation — heuristic defaults per declension
+// ============================================================
+
+/// Generate a default plural paradigm from lemma, gender, and declension.
+///
+/// Mirrors the guesser's sub-classification within each declension so the
+/// plural strategy is consistent with *why* the word has that declension.
+/// BuNaMo-attested forms are preferable when available.
+pub fn plural_paradigm(lemma: &str, gender: Gender, declension: i8) -> Option<PluralInfo> {
+    match declension {
+        1 => Some(plural_paradigm_1st(lemma)),
+        2 => Some(plural_paradigm_2nd(lemma, gender)),
+        3 => Some(plural_paradigm_3rd(lemma, gender)),
+        4 => Some(plural_paradigm_4th(lemma, gender)),
+        5 => None, // too irregular
+        _ => None,
+    }
+}
+
+/// 1st decl (masc, broad consonant): weak plural by slenderization (LgC).
+/// Mirrors is_first_simple: gender == Masc && !is_slender.
+fn plural_paradigm_1st(lemma: &str) -> PluralInfo {
+    let target = IRREGULARLY_PALATALIZED_1ST.iter()
+        .find(|(l, _)| *l == lemma)
+        .map(|(_, t)| *t)
+        .unwrap_or("");
+    plural_info::plural_info_lgc(lemma, target)
+}
+
+/// 2nd decl plural, mirroring is_second_simple sub-conditions.
+fn plural_paradigm_2nd(lemma: &str, _gender: Gender) -> PluralInfo {
+    // -ach (polysyllabic) → strong -aí: bolgach → bolgaí
+    // Mirrors the singular_paradigm_2nd polysyllabic -ach/-each branch
+    if (lemma.ends_with("ach") || lemma.ends_with("each")) && opers::polysyllabic(lemma) {
+        let base = if lemma.ends_with("each") {
+            &lemma[..lemma.len() - "each".len()]
+        } else {
+            &lemma[..lemma.len() - "ach".len()]
+        };
+        return plural_info::plural_info_tr(&format!("{}aí", base));
+    }
+    // -eog/-óg → LgA (broaden + a): bróg → bróga, fuinneog → fuinneoga
+    // Mirrors re_ends(lemma, &["eog", "óg"]) in is_second_simple
+    if re_ends(lemma, &["eog", "óg"]) {
+        return plural_info::plural_info_lga(lemma, "");
+    }
+    // -lann → LgA: clann → clanna
+    if lemma.ends_with("lann") {
+        return plural_info::plural_info_lga(lemma, "");
+    }
+    // Slender consonant → LgE (slenderize + e)
+    // Mirrors is_slender check in is_second_simple
+    if opers::is_slender(lemma) {
+        return plural_info::plural_info_lge(lemma, "");
+    }
+    // Remaining broad consonant (shouldn't happen often for 2nd decl) → LgA
+    plural_info::plural_info_lga(lemma, "")
+}
+
+/// 3rd decl plural, mirroring is_third_simple sub-conditions.
+fn plural_paradigm_3rd(lemma: &str, gender: Gender) -> PluralInfo {
+    // Masc agent nouns -éir/-eoir/-óir/-úir → strong -í: dochtúir → dochtúirí
+    // Mirrors re_ends(lemma, &["éir", "eoir", "óir", "úir"]) in is_third_simple
+    if gender == Gender::Masc && re_ends(lemma, &["éir", "eoir", "óir", "úir"]) {
+        return plural_info::plural_info_tr(&format!("{}í", lemma));
+    }
+    // Fem -cht (abstract nouns) → strong -aí: beannacht → beannachtaí
+    // Mirrors "cht" in is_third_simple's fem patterns
+    if gender == Gender::Fem && lemma.ends_with("cht") {
+        return plural_info::plural_info_tr(&format!("{}aí", lemma));
+    }
+    // Fem -irt → strong -í: cosaint → cosaintí
+    if gender == Gender::Fem && lemma.ends_with("irt") {
+        return plural_info::plural_info_tr(&format!("{}í", lemma));
+    }
+    // Default: slender → -í, broad → -aí
+    if opers::is_slender(lemma) {
+        plural_info::plural_info_tr(&format!("{}í", lemma))
+    } else {
+        plural_info::plural_info_tr(&format!("{}aí", lemma))
+    }
+}
+
+/// 4th decl plural, mirroring is_fourth_simple sub-conditions.
+fn plural_paradigm_4th(lemma: &str, _gender: Gender) -> PluralInfo {
+    // Loanwords → strong -anna: bus → busanna
+    // Mirrors the POSSIBLE_LOANWORDS_GENITIVELESS check in is_fourth_simple
+    if in_list(lemma, POSSIBLE_LOANWORDS_GENITIVELESS) {
+        return plural_info::plural_info_tr(&format!("{}anna", lemma));
+    }
+    // -ín → strong -í: cailín → cailíní
+    // Mirrors "ín" in is_fourth_simple's masc re_ends
+    if lemma.ends_with("ín") {
+        return plural_info::plural_info_tr(&format!("{}í", lemma));
+    }
+    // -e → drop + -í: buille → buillí, coiste → coistí
+    if lemma.ends_with('e') {
+        return plural_info::plural_info_tr(&format!("{}í", &lemma[..lemma.len() - 1]));
+    }
+    // -ú → -uithe: scrúdú → scrúduithe
+    if lemma.ends_with("ú") {
+        return plural_info::plural_info_tr(
+            &format!("{}uithe", &lemma[..lemma.len() - 'ú'.len_utf8()])
+        );
+    }
+    // Other vowel endings → -nna
+    plural_info::plural_info_tr(&format!("{}nna", lemma))
+}
+
+// ============================================================
+// Full paradigm construction
+// ============================================================
+
+impl Noun {
+    /// Build a full noun paradigm from lemma, gender, and declension class.
+    ///
+    /// Computes singular forms (nom/gen/voc/dat) via the SingularInfo
+    /// strategy for the declension, and plural forms via heuristic defaults.
+    /// For words with BuNaMo-attested paradigms, prefer loading from XML.
+    pub fn from_lemma_with_declension(lemma: &str, gender: Gender, declension: i8) -> Self {
+        let si = singular_paradigm(lemma, gender, declension);
+        let pi = plural_paradigm(lemma, gender, declension);
+
+        if let Some(si) = si {
+            Self::create_from_info(&si, pi.as_ref(), declension)
+        } else {
+            let mut noun = Self::from_lemma(lemma, gender);
+            noun.declension = declension;
+            noun
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1072,5 +1180,137 @@ mod tests {
     #[test]
     fn test_genitive_irregular_declension() {
         assert_eq!(generate_genitive("bean", Gender::Fem, 0).unwrap(), "mná");
+    }
+
+    // ---- singular_paradigm tests ----
+
+    #[test]
+    fn test_singular_paradigm_1st_returns_all_cases() {
+        let si = singular_paradigm("bád", Gender::Masc, 1).unwrap();
+        assert_eq!(si.nominative[0].value, "bád");
+        assert_eq!(si.genitive[0].value, "báid");
+        assert_eq!(si.vocative[0].value, "báid"); // masc 1st: voc = slenderized
+        assert_eq!(si.dative[0].value, "bád");
+    }
+
+    #[test]
+    fn test_singular_paradigm_2nd_fem() {
+        let si = singular_paradigm("bróg", Gender::Fem, 2).unwrap();
+        assert_eq!(si.nominative[0].value, "bróg");
+        assert_eq!(si.genitive[0].value, "bróige");
+        assert_eq!(si.vocative[0].value, "bróg"); // fem: voc unchanged
+    }
+
+    #[test]
+    fn test_singular_paradigm_4th_gen_eq_nom() {
+        let si = singular_paradigm("bainne", Gender::Masc, 4).unwrap();
+        assert_eq!(si.nominative[0].value, "bainne");
+        assert_eq!(si.genitive[0].value, "bainne");
+        assert_eq!(si.vocative[0].value, "bainne");
+        assert_eq!(si.dative[0].value, "bainne");
+    }
+
+    #[test]
+    fn test_singular_paradigm_fully_irregular_overrides_genitive() {
+        // laoch is FULLY_IRREGULAR (1, "laoich") — genitive overridden,
+        // but voc/dat should come from the standard 1st decl strategy
+        let si = singular_paradigm("laoch", Gender::Masc, 1).unwrap();
+        assert_eq!(si.genitive[0].value, "laoich");
+        assert_eq!(si.nominative[0].value, "laoch");
+    }
+
+    #[test]
+    fn test_singular_paradigm_irregular_declension() {
+        let si = singular_paradigm("bean", Gender::Fem, 0).unwrap();
+        assert_eq!(si.genitive[0].value, "mná");
+        assert_eq!(si.nominative[0].value, "bean");
+    }
+
+    // ---- plural_paradigm tests ----
+
+    #[test]
+    fn test_plural_1st_weak_slenderize() {
+        let pi = plural_paradigm("bád", Gender::Masc, 1).unwrap();
+        assert_eq!(pi.nominative[0].value, "báid");
+        assert_eq!(pi.genitive[0].value, "bád"); // weak: gen = broadened = lemma
+    }
+
+    #[test]
+    fn test_plural_2nd_og_lga() {
+        // -óg triggers LgA (broaden+a), matching is_second_simple's re_ends
+        let pi = plural_paradigm("bróg", Gender::Fem, 2).unwrap();
+        assert_eq!(pi.nominative[0].value, "bróga");
+    }
+
+    #[test]
+    fn test_plural_2nd_eog_lga() {
+        let pi = plural_paradigm("fuinneog", Gender::Fem, 2).unwrap();
+        assert_eq!(pi.nominative[0].value, "fuinneoga");
+    }
+
+    #[test]
+    fn test_plural_2nd_lann_lga() {
+        let pi = plural_paradigm("clann", Gender::Fem, 2).unwrap();
+        assert_eq!(pi.nominative[0].value, "clanna");
+    }
+
+    #[test]
+    fn test_plural_2nd_polysyllabic_ach() {
+        let pi = plural_paradigm("bolgach", Gender::Fem, 2).unwrap();
+        assert_eq!(pi.nominative[0].value, "bolgaí"); // strong -aí
+        assert_eq!(pi.genitive[0].value, "bolgaí"); // strong: gen = nom
+    }
+
+    #[test]
+    fn test_plural_3rd_masc_agent() {
+        // Masc -úir → strong -í, matching is_third_simple's agent noun pattern
+        let pi = plural_paradigm("dochtúir", Gender::Masc, 3).unwrap();
+        assert_eq!(pi.nominative[0].value, "dochtúirí");
+    }
+
+    #[test]
+    fn test_plural_3rd_fem_cht() {
+        // Fem -cht → strong -aí, matching is_third_simple's "cht" pattern
+        let pi = plural_paradigm("beannacht", Gender::Fem, 3).unwrap();
+        assert_eq!(pi.nominative[0].value, "beannachtaí");
+    }
+
+    #[test]
+    fn test_plural_4th_e_ending() {
+        let pi = plural_paradigm("buille", Gender::Masc, 4).unwrap();
+        assert_eq!(pi.nominative[0].value, "buillí");
+    }
+
+    #[test]
+    fn test_plural_4th_loanword() {
+        // Loanwords → strong -anna, matching is_fourth_simple's loanword check
+        let pi = plural_paradigm("bus", Gender::Masc, 4).unwrap();
+        assert_eq!(pi.nominative[0].value, "busanna");
+    }
+
+    #[test]
+    fn test_plural_4th_in_ending() {
+        // -ín → strong -í, matching is_fourth_simple's "ín" pattern
+        let pi = plural_paradigm("cailín", Gender::Masc, 4).unwrap();
+        assert_eq!(pi.nominative[0].value, "cailíní");
+    }
+
+    #[test]
+    fn test_plural_5th_returns_none() {
+        assert!(plural_paradigm("athair", Gender::Masc, 5).is_none());
+    }
+
+    // ---- from_lemma_with_declension tests ----
+
+    #[test]
+    fn test_from_lemma_with_declension_fills_all_fields() {
+        let noun = Noun::from_lemma_with_declension("bád", Gender::Masc, 1);
+        assert_eq!(noun.declension, 1);
+        assert_eq!(noun.sg_nom[0].value, "bád");
+        assert_eq!(noun.sg_gen[0].value, "báid");
+        assert_eq!(noun.sg_voc[0].value, "báid");
+        assert_eq!(noun.sg_dat[0].value, "bád");
+        assert!(!noun.pl_nom.is_empty()); // has plural
+        assert_eq!(noun.pl_nom[0].value, "báid");
     }
 }
