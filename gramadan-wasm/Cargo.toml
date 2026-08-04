@@ -1,0 +1,19 @@
+[package]
+name = "gramadan-wasm"
+version = "0.0.0"
+edition = "2021"
+
+# WASM binding: generate morphological paradigms (as a flat FormItem[] with BuNaMo
+# tags) for Gréasán's paradigm.ts::buildParadigm. Noun is live; verb/adjective are
+# stubbed pending gramadan-rs support (see gramadan-rs/HANDOFF-verb-adjective-paradigms.md).
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+gramadan = { path = "../gramadan-rs", default-features = false }
+wasm-bindgen = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = "s"
