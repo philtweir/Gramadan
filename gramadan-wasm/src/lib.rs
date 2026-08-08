@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gréasán morphology binding. `paradigm_forms(lemma, pos, gender, class)` returns
 //! a JSON `{ declension, forms }` where `forms` is a flat `FormItem[]`
-//! (`{writtenRep, tags}`) using BuNaMo's tag vocabulary — the exact shape
+//! (`{writtenRep, tags}`) using BuNaMo's tag vocabulary - the exact shape
 //! `app/src/lib/paradigm.ts::buildParadigm` pivots into a table.
 //!
 //! NOUN emits the full grid from gramadan-rs's `singular_paradigm` (nom/gen/voc/
@@ -11,7 +11,7 @@
 //! so the grid is never empty. VERB and ADJECTIVE paradigms are still stubbed and
 //! land when gramadan-rs gains them (see
 //! gramadan-rs/HANDOFF-verb-adjective-paradigms.md). The tag mapping below is the
-//! single place struct-slots become tags — extend it, and Gréasán renders the new
+//! single place struct-slots become tags - extend it, and Gréasán renders the new
 //! forms with no frontend change.
 
 use gramadan::features::{Form, Gender};
@@ -19,6 +19,7 @@ use gramadan::noun::{
     generate_genitive, guess_declension, plural_paradigm, singular_paradigm, Declension, Noun,
 };
 use gramadan::np::NounPhrase;
+use gramadan::verb::{guess_conjugation, PersonForms, TenseForms, Verb, VerbConjugationClass};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -82,7 +83,7 @@ fn noun_paradigm(lemma: &str, gender: &str, class: &str) -> Paradigm {
         .parse::<i8>()
         .ok()
         .filter(|d| (1..=5).contains(d))
-        .unwrap_or_else(|| decl_i8(guess_declension(lemma, g)));
+        .unwrap_or_else(|| guess_declension(lemma, g).map(decl_i8).unwrap_or(0));
 
     let mut forms: Vec<FormItem> = Vec::new();
 
@@ -110,7 +111,7 @@ fn noun_paradigm(lemma: &str, gender: &str, class: &str) -> Paradigm {
     }
 
     // The nominative singular must always carry the headword, even if the paradigm
-    // strategy left it empty — otherwise the table loses its anchor row.
+    // strategy left it empty - otherwise the table loses its anchor row.
     if !forms
         .iter()
         .any(|f| f.tags == ["singular", "nominative"])
@@ -130,7 +131,7 @@ fn noun_paradigm(lemma: &str, gender: &str, class: &str) -> Paradigm {
         push_forms(&mut forms, &pi.vocative, "plural", "vocative");
     }
 
-    // Definite (articled) forms — "an bhróg" / "na mbróg" — tagged `definite` so the
+    // Definite (articled) forms - "an bhróg" / "na mbróg" - tagged `definite` so the
     // frontend article toggle can swap them in. Nom/gen sg+pl only (NounPhrase does
     // not yet cover voc/dat). The Noun is rebuilt from the same lemma+decl.
     let np = NounPhrase::from_noun(&Noun::from_lemma_with_declension(lemma, g, decl));
@@ -157,6 +158,108 @@ fn noun_paradigm(lemma: &str, gender: &str, class: &str) -> Paradigm {
     }
 }
 
+/// Map the entry's stated verb class ("1"/"2"/"irr") to gramadan's conjugation
+/// class; guess from the lemma when unstated.
+fn verb_class(class: &str, lemma: &str) -> VerbConjugationClass {
+    match class.trim() {
+        "1" => VerbConjugationClass::First,
+        "2" => VerbConjugationClass::Second,
+        "irr" | "0" => VerbConjugationClass::Irregular,
+        _ => guess_conjugation(lemma),
+    }
+}
+
+/// BuNaMo-style person tags for a PersonForms slot. Base (analytic) carries no
+/// person tag; Auto is the autonomous form. Mirrors build-bunamo-data.py's
+/// PERSON_MAP so both grammar tabs pivot identically in paradigm.ts.
+fn person_tags(person: &str) -> Vec<&'static str> {
+    match person {
+        "sg1" => vec!["singular", "first-person"],
+        "sg2" => vec!["singular", "second-person"],
+        "sg3" => vec!["singular", "third-person"],
+        "pl1" => vec!["plural", "first-person"],
+        "pl2" => vec!["plural", "second-person"],
+        "pl3" => vec!["plural", "third-person"],
+        "auto" => vec!["autonomous"],
+        _ => vec![],
+    }
+}
+
+/// Emit one FormItem per person slot of a PersonForms, tagged with `base_tags`
+/// (tense/mood + "indicative") plus the person tags, and "dependent" for the
+/// dependent set (the frontend independent/dependent toggle filters on it).
+fn push_person(out: &mut Vec<FormItem>, pf: &PersonForms, base_tags: &[&'static str], dep: bool) {
+    let slots: [(&str, &Vec<Form>); 8] = [
+        ("base", &pf.base),
+        ("sg1", &pf.sg1),
+        ("sg2", &pf.sg2),
+        ("sg3", &pf.sg3),
+        ("pl1", &pf.pl1),
+        ("pl2", &pf.pl2),
+        ("pl3", &pf.pl3),
+        ("auto", &pf.auto),
+    ];
+    for (key, forms) in slots {
+        for f in forms {
+            let v = f.value.trim();
+            if v.is_empty() {
+                continue;
+            }
+            let mut tags: Vec<&'static str> = base_tags.to_vec();
+            tags.extend(person_tags(key));
+            if dep {
+                tags.push("dependent");
+            }
+            out.push(FormItem { written_rep: v.to_string(), tags });
+        }
+    }
+}
+
+/// Learner-core verb conjugation: verbal noun/adjective, past/present/future/
+/// conditional (each with independent + dependent sets) and the imperative. The
+/// habitual and subjunctive tenses are omitted for now. Dependent forms carry a
+/// "dependent" tag so the frontend can toggle independent vs dependent.
+fn verb_paradigm(lemma: &str, class: &str) -> Paradigm {
+    let vc = verb_class(class, lemma);
+    let v = Verb::from_lemma(lemma, vc);
+    let mut forms: Vec<FormItem> = Vec::new();
+
+    for f in &v.verbal_noun {
+        let val = f.value.trim();
+        if !val.is_empty() {
+            forms.push(FormItem { written_rep: val.to_string(), tags: vec!["verbal-noun"] });
+        }
+    }
+    for f in &v.verbal_adjective {
+        let val = f.value.trim();
+        if !val.is_empty() {
+            forms.push(FormItem { written_rep: val.to_string(), tags: vec!["verbal-adjective"] });
+        }
+    }
+
+    // "present" maps to gramadan's present-habitual (pres_cont), the everyday
+    // present for all verbs bar the copula/ta.
+    let tenses: [(&TenseForms, &'static str); 4] = [
+        (&v.past, "past"),
+        (&v.pres_cont, "present"),
+        (&v.fut, "future"),
+        (&v.cond, "conditional"),
+    ];
+    for (tf, tense) in tenses {
+        push_person(&mut forms, &tf.indep, &[tense, "indicative"], false);
+        push_person(&mut forms, &tf.dep, &[tense, "indicative"], true);
+    }
+    // Imperative has no independent/dependent split.
+    push_person(&mut forms, &v.imper, &["imperative"], false);
+
+    let conj = match vc {
+        VerbConjugationClass::First => 1,
+        VerbConjugationClass::Second => 2,
+        VerbConjugationClass::Irregular => 0,
+    };
+    Paradigm { declension: conj, supported: true, forms }
+}
+
 /// Generate a paradigm for one headword. `pos` ∈ {"noun","verb","adjective"};
 /// `gender` is the gender label ("masculine"/"feminine"/…, empty ok); `class` is
 /// the stated grammatical class ("1".."5", or empty to guess). Returns JSON.
@@ -164,8 +267,9 @@ fn noun_paradigm(lemma: &str, gender: &str, class: &str) -> Paradigm {
 pub fn paradigm_forms(lemma: &str, pos: &str, gender: &str, class: &str) -> String {
     let p = match pos.to_ascii_lowercase().as_str() {
         "noun" => noun_paradigm(lemma, gender, class),
-        // Verb / adjective generation not in gramadan-rs yet — placeholder so the
-        // frontend can route by POS today and light up when the crate gains them.
+        "verb" => verb_paradigm(lemma, class),
+        // Adjective generation not in gramadan-rs yet: placeholder so the frontend
+        // can route by POS today and light up when the crate gains it.
         _ => Paradigm {
             declension: 0,
             supported: false,
