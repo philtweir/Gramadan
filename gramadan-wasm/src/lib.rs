@@ -14,6 +14,7 @@
 //! single place struct-slots become tags - extend it, and Gréasán renders the new
 //! forms with no frontend change.
 
+use gramadan::adjective;
 use gramadan::features::{Form, Gender};
 use gramadan::noun::{
     generate_genitive, guess_declension, plural_paradigm, singular_paradigm, Declension, Noun,
@@ -260,6 +261,51 @@ fn verb_paradigm(lemma: &str, class: &str) -> Paradigm {
     Paradigm { declension: conj, supported: true, forms }
 }
 
+/// Map the entry's stated adjective class ("1".."3") to a declension; guess otherwise.
+fn adj_class(class: &str, lemma: &str) -> Declension {
+    match class.trim() {
+        "1" => Declension::First,
+        "2" => Declension::Second,
+        "3" => Declension::Third,
+        _ => adjective::guess_declension(lemma),
+    }
+}
+
+fn push_adj(out: &mut Vec<FormItem>, v: &str, tags: Vec<&'static str>) {
+    let v = v.trim();
+    if !v.is_empty() {
+        out.push(FormItem { written_rep: v.to_string(), tags });
+    }
+}
+
+/// Learner-core adjective declension: nominative singular, genitive singular
+/// (masculine + feminine - the gender split), nominative plural, and the graded
+/// (comparative/superlative) form. Vocative is skipped (not attested in BuNaMo,
+/// so both tabs stay consistent). Tagged in BuNaMo's vocabulary; gender rides as a
+/// cell qualifier so paradigm.ts shows masc/fem genitive side by side.
+fn adjective_paradigm(lemma: &str, class: &str) -> Paradigm {
+    let decl = adj_class(class, lemma);
+    let mut forms: Vec<FormItem> = Vec::new();
+    if let Some(a) = adjective::generate_forms(lemma, decl) {
+        push_adj(&mut forms, &a.sg_nom, vec!["singular", "nominative"]);
+        push_adj(&mut forms, &a.sg_gen_masc, vec!["singular", "genitive", "masculine"]);
+        push_adj(&mut forms, &a.sg_gen_fem, vec!["singular", "genitive", "feminine"]);
+        push_adj(&mut forms, &a.pl_nom, vec!["plural", "nominative"]);
+        push_adj(&mut forms, &a.graded, vec!["comparative", "superlative"]);
+    }
+    // Anchor row: the nominative singular always carries the headword.
+    if !forms.iter().any(|f| f.tags == ["singular", "nominative"]) {
+        forms.insert(0, FormItem { written_rep: lemma.to_string(), tags: vec!["singular", "nominative"] });
+    }
+    let d = match decl {
+        Declension::First => 1,
+        Declension::Second => 2,
+        Declension::Third => 3,
+        _ => 0,
+    };
+    Paradigm { declension: d, supported: true, forms }
+}
+
 /// Generate a paradigm for one headword. `pos` ∈ {"noun","verb","adjective"};
 /// `gender` is the gender label ("masculine"/"feminine"/…, empty ok); `class` is
 /// the stated grammatical class ("1".."5", or empty to guess). Returns JSON.
@@ -268,8 +314,7 @@ pub fn paradigm_forms(lemma: &str, pos: &str, gender: &str, class: &str) -> Stri
     let p = match pos.to_ascii_lowercase().as_str() {
         "noun" => noun_paradigm(lemma, gender, class),
         "verb" => verb_paradigm(lemma, class),
-        // Adjective generation not in gramadan-rs yet: placeholder so the frontend
-        // can route by POS today and light up when the crate gains it.
+        "adjective" | "adj" => adjective_paradigm(lemma, class),
         _ => Paradigm {
             declension: 0,
             supported: false,
