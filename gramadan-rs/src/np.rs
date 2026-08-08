@@ -5,7 +5,7 @@
 //! `na mbróg`, etc., reusing `opers::mutate` for the mutations themselves.
 //!
 //! STATUS: first cut. Covers nominative + genitive, singular + plural, with and
-//! without article — the cells the Gréasán declension grid shows in "definite"
+//! without article - the cells the Gréasán declension grid shows in "definite"
 //! mode. The dative-with-article is dialectal (northern vs southern `sgDatArt`)
 //! and is NOT ported yet; `is_definite` (already-definite heads take no article)
 //! is likewise a TODO. Validate against BuNaMo's `nounPhrase/*.xml` articled forms
