@@ -15,7 +15,8 @@
 //! forms with no frontend change.
 
 use gramadan::adjective;
-use gramadan::features::{Form, Gender};
+use gramadan::features::{Form, Gender, Mutation};
+use gramadan::opers;
 use gramadan::noun::{
     generate_genitive, guess_declension, plural_paradigm, singular_paradigm, Declension, Noun,
 };
@@ -186,10 +187,47 @@ fn person_tags(person: &str) -> Vec<&'static str> {
     }
 }
 
+/// Independent declarative-positive initial mutation for the four grid tenses,
+/// matching Gramadan v2's tense rules (validated to 0 output mismatches across
+/// all BuNaMo verbs). Regular verbs: past + conditional lenite (Len1D adds d'
+/// before a vowel/f), present/future don't, and the autonomous PAST stays plain
+/// (moladh). Exceptions: abair (dúirt/déarfadh never lenite), faigh (past "fuair"
+/// plain, future "gheobhaidh" lenites), and six irregulars whose past lenites
+/// throughout incl. the autonomous (thángthas, chonacthas): bí/clois/cluin/feic/
+/// tar/téigh. All other irregulars mutate regularly - the irregularity is in the
+/// stored stem, not the mutation.
+fn independent_mutation(lemma: &str, tense: &str, is_auto: bool) -> Mutation {
+    match tense {
+        "past" => match lemma {
+            "abair" | "faigh" => Mutation::Nil,
+            "bí" | "clois" | "cluin" | "feic" | "tar" | "téigh" => Mutation::Len1,
+            _ if is_auto => Mutation::Nil,
+            _ => Mutation::Len1D,
+        },
+        "conditional" => {
+            if lemma == "abair" { Mutation::Nil } else { Mutation::Len1D }
+        }
+        "future" => {
+            if lemma == "faigh" { Mutation::Len1 } else { Mutation::Nil }
+        }
+        _ => Mutation::Nil, // present (pres_cont), imperative
+    }
+}
+
 /// Emit one FormItem per person slot of a PersonForms, tagged with `base_tags`
 /// (tense/mood + "indicative") plus the person tags, and "dependent" for the
 /// dependent set (the frontend independent/dependent toggle filters on it).
-fn push_person(out: &mut Vec<FormItem>, pf: &PersonForms, base_tags: &[&'static str], dep: bool) {
+/// Independent forms get the initial mutation baked on (see independent_mutation);
+/// dependent forms stay radical so the frontend toggle can add the particle + its
+/// eclipsis/lenition to the stored dependent stem.
+fn push_person(
+    out: &mut Vec<FormItem>,
+    pf: &PersonForms,
+    base_tags: &[&'static str],
+    dep: bool,
+    lemma: &str,
+) {
+    let tense = base_tags.first().copied().unwrap_or("");
     let slots: [(&str, &Vec<Form>); 8] = [
         ("base", &pf.base),
         ("sg1", &pf.sg1),
@@ -206,12 +244,17 @@ fn push_person(out: &mut Vec<FormItem>, pf: &PersonForms, base_tags: &[&'static 
             if v.is_empty() {
                 continue;
             }
+            let written = if dep {
+                v.to_string()
+            } else {
+                opers::mutate(independent_mutation(lemma, tense, key == "auto"), v)
+            };
             let mut tags: Vec<&'static str> = base_tags.to_vec();
             tags.extend(person_tags(key));
             if dep {
                 tags.push("dependent");
             }
-            out.push(FormItem { written_rep: v.to_string(), tags });
+            out.push(FormItem { written_rep: written, tags });
         }
     }
 }
@@ -247,11 +290,11 @@ fn verb_paradigm(lemma: &str, class: &str) -> Paradigm {
         (&v.cond, "conditional"),
     ];
     for (tf, tense) in tenses {
-        push_person(&mut forms, &tf.indep, &[tense, "indicative"], false);
-        push_person(&mut forms, &tf.dep, &[tense, "indicative"], true);
+        push_person(&mut forms, &tf.indep, &[tense, "indicative"], false, lemma);
+        push_person(&mut forms, &tf.dep, &[tense, "indicative"], true, lemma);
     }
     // Imperative has no independent/dependent split.
-    push_person(&mut forms, &v.imper, &["imperative"], false);
+    push_person(&mut forms, &v.imper, &["imperative"], false, lemma);
 
     let conj = match vc {
         VerbConjugationClass::First => 1,
@@ -322,4 +365,37 @@ pub fn paradigm_forms(lemma: &str, pos: &str, gender: &str, class: &str) -> Stri
         },
     };
     serde_json::to_string(&p).unwrap_or_else(|_| "{\"supported\":false,\"forms\":[]}".to_string())
+}
+
+#[cfg(test)]
+mod indep_mutation_tests {
+    use super::*;
+
+    fn indep(lemma: &str, class: &str, tense: &str) -> Vec<String> {
+        verb_paradigm(lemma, class)
+            .forms
+            .into_iter()
+            .filter(|f| f.tags.contains(&tense) && !f.tags.contains(&"dependent"))
+            .map(|f| f.written_rep)
+            .collect()
+    }
+
+    #[test]
+    fn independent_forms_are_realised() {
+        // Regular: past + conditional lenite (d' for vowel/f), future doesn't.
+        assert!(indep("mol", "1", "past").contains(&"mhol".to_string()), "mol past");
+        assert!(indep("ól", "1", "past").contains(&"d'ól".to_string()), "ól past");
+        assert!(indep("fág", "1", "past").contains(&"d'fhág".to_string()), "fág past");
+        assert!(indep("mol", "1", "conditional").contains(&"mholfadh".to_string()), "mol cond");
+        assert!(indep("ól", "1", "conditional").contains(&"d'ólfadh".to_string()), "ól cond");
+        // Autonomous past stays plain; autonomous conditional lenites.
+        assert!(indep("mol", "1", "past").contains(&"moladh".to_string()), "mol auto past");
+        assert!(indep("mol", "1", "conditional").contains(&"mholfaí".to_string()), "mol auto cond");
+        // Irregular exceptions.
+        assert!(indep("tar", "irr", "past").contains(&"tháinig".to_string()), "tar past");
+        assert!(indep("faigh", "irr", "past").contains(&"fuair".to_string()), "faigh past no-lenite");
+        assert!(indep("faigh", "irr", "future").contains(&"gheobhaidh".to_string()), "faigh fut lenite");
+        assert!(indep("abair", "irr", "past").contains(&"dúirt".to_string()), "abair past no-lenite");
+        assert!(indep("feic", "irr", "past").contains(&"chonaic".to_string()), "feic past");
+    }
 }
