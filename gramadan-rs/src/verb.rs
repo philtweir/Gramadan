@@ -389,6 +389,12 @@ impl Verb {
         if lemma == "ionnail" {
             v.subj.pl1 = vec![Form::new("ionlaimis")];
         }
+        if v.verbal_adjective.is_empty() && class != VerbConjugationClass::Irregular {
+            v.verbal_adjective = generate_verbal_adjective(lemma, class);
+        }
+        if v.verbal_noun.is_empty() && class != VerbConjugationClass::Irregular {
+            v.verbal_noun = generate_verbal_noun(lemma, class);
+        }
         v
     }
 
@@ -691,63 +697,55 @@ fn needs_syncope_first(lemma: &str) -> bool {
     false
 }
 
-/// Verbs with deep syncopation: short unstressed final vowel is fully
-/// absorbed, giving a syncopated stem for most tenses and a broadened
-/// stem for future/conditional. Returns (stem, f_base) via compound
-/// matching on the table suffix.
+/// Verbs with deep syncopation where per-verb stem data is needed to match
+/// the Caighdeán/BuNaMo paradigms. Each verb may use a different stem for
+/// different slot groups (syncopated, broadened, or lemma).
 ///
-/// Entries: (suffix, stem, t_stem, f_base, c_base, synth_stem)
-/// - stem: syncopated, used for past.auto and as default for synthetic forms
-/// - t_stem: used for pastcont t-suffix forms (sg2, auto)
-/// - f_base: future stem base (f_base + "f" → future forms)
-/// - c_base: conditional stem base; None = same as f_base
-/// - synth_stem: override for non-auto synthetic forms (past.pl1/pl3,
-///               pastcont non-t, prescont non-t); None = same as stem
+/// Columns: (suffix, syn, ss, t, pt, f, c)
+/// - syn:  syncopated stem (present base, past auto, default synthetic)
+/// - ss:   synth stem override for non-auto synthetic forms; None = syn
+/// - t:    pastcont t-suffix stem (sg2, auto)
+/// - pt:   prescont/imper/subj auto t-suffix stem (= t except achair)
+/// - f:    future base (+ "f" → future stem)
+/// - c:    conditional base (+ "f" → cond stem; = f except adhain/athadhain)
 ///
-/// Note: prescont/imper/subj autonomous use pres_t_stem (see DeepSyncopeResult).
-/// For most verbs pres_t_stem == t_stem; achair is the exception (t_stem="achar"
-/// for pastcont, but pres_t_stem="achair" for prescont/imper/subj).
-const DEEP_SYNCOPE_VERBS: &[(&str, &str, &str, &str, Option<&str>, Option<&str>)] = &[
-    ("achair",    "achr",     "achar",    "achar",    None,             None),
-    ("adhain",    "adhn",     "adhn",     "adhan",    Some("adhn"),     None),
-    ("athadhain", "athadhn",  "athadhn",  "athadhan", Some("athadhn"),  None),
-    ("déadail",   "déadl",    "déadla",   "déadla",   None,             None),
-    ("diongaibh", "diongbh",  "diongbha", "diongbha", None,             None),
-    ("ionnail",   "ionnal",   "ionnal",   "ionnal",   None,             Some("ionl")),
-    ("tiomain",   "tiomn",    "tioman",   "tioman",   None,             None),
+/// deighil: f/c use lemma (gnag's deighilfidh, attested on Wiktionary).
+const DEEP_SYNCOPE_VERBS: &[(&str, &str, Option<&str>, &str, &str, &str, &str)] = &[
+    //                syn        ss           t           pt          f           c
+    ("achair",    "achr",    None,         "achar",    "achair",  "achar",    "achar"),
+    ("adhain",    "adhn",    None,         "adhn",     "adhn",    "adhan",    "adhn"),
+    ("athadhain", "athadhn", None,         "athadhn",  "athadhn", "athadhan", "athadhn"),
+    ("deighil",   "deighl",  None,         "deighl",   "deighl",  "deighil",  "deighil"),
+    ("déadail",   "déadl",   None,         "déadla",   "déadla",  "déadla",   "déadla"),
+    ("diongaibh", "diongbh", None,         "diongbha", "diongbha","diongbha", "diongbha"),
+    ("ionnail",   "ionnal",  Some("ionl"), "ionnal",   "ionnal",  "ionnal",   "ionnal"),
+    ("tiomain",   "tiomn",   None,         "tioman",   "tioman",  "tioman",   "tioman"),
 ];
 
 struct DeepSyncopeResult {
     stem: String,
+    synth_stem: Option<String>,
     t_stem: String,
     pres_t_stem: String,
     f_base: String,
     c_base: String,
-    synth_stem: Option<String>,
 }
 
 fn lookup_deep_syncope(lemma: &str) -> Option<DeepSyncopeResult> {
     let l = lemma.to_lowercase();
-    for &(suffix, syn_end, t_end, f_end, c_end, ss_end) in DEEP_SYNCOPE_VERBS {
+    for &(suffix, syn_end, ss_end, t_end, pt_end, f_end, c_end) in DEEP_SYNCOPE_VERBS {
         if l.ends_with(suffix) {
             let prefix = &lemma[..lemma.len() - suffix.len()];
             if prefix.is_empty()
-                || prefix.ends_with(|c: char| c == '-' || c == 'h' || c == 'n' || c == 't')
+                || prefix.ends_with(|c: char| c == '-' || c == 'h' || c == 'n' || c == 't' || c == 'd')
             {
-                let t_stem = format!("{}{}", prefix, t_end);
-                // achair: prescont/imper/subj auto uses lemma stem, not broadened
-                let pres_t = if l.ends_with("achair") {
-                    lemma.to_string()
-                } else {
-                    t_stem.clone()
-                };
                 return Some(DeepSyncopeResult {
                     stem: format!("{}{}", prefix, syn_end),
-                    t_stem,
-                    pres_t_stem: pres_t,
-                    f_base: format!("{}{}", prefix, f_end),
-                    c_base: format!("{}{}", prefix, c_end.unwrap_or(f_end)),
                     synth_stem: ss_end.map(|s| format!("{}{}", prefix, s)),
+                    t_stem: format!("{}{}", prefix, t_end),
+                    pres_t_stem: format!("{}{}", prefix, pt_end),
+                    f_base: format!("{}{}", prefix, f_end),
+                    c_base: format!("{}{}", prefix, c_end),
                 });
             }
         }
@@ -874,7 +872,11 @@ fn conjugate_first(lemma: &str) -> Verb {
     let ds_result = lookup_deep_syncope(effective_lemma);
 
     // (stem, slender, t_stem, pres_t_stem, f_base, c_base)
-    // t_stem: for pastcont sg2/auto. pres_t_stem: for prescont/imper/subj auto.
+    // stem: syncopated/broadened, for present analytic + past auto
+    // t_stem: for pastcont sg2/auto
+    // pres_t_stem: for prescont/imper/subj auto (= t_stem except achair)
+    // f_base: for future (f_base + "f" → f_stem)
+    // c_base: for conditional (c_base + "f" → c_stem; = f_base except adhain/athadhain)
     let el = effective_lemma;
     let (stem, sl, t_stem, pres_t_stem, f_base, c_base) = if l_lower.ends_with("igh") && opers::polysyllabic(lemma) {
         let root = el[..el.len() - "igh".len()].to_string();
@@ -1021,19 +1023,10 @@ fn conjugate_first_igh(v: &mut Verb, lemma: &str) -> Verb {
     v.fut.set_both(VerbPerson::Pl1,  &suf(&f_stem, f_sl, "aimid", "imid"));
     v.fut.set_both(VerbPerson::Auto, &suf(&f_stem, f_sl, "ar",    "ear"));
 
-    // For é-root -igh, cond.pl1 contracts -if+imis → -fimis (drop i between é and f)
-    let cond_pl1_stem = if root_is_é {
-        format!("{}f", root)
-    } else {
-        f_stem.clone()
-    };
-    let cond_pl1_sl = opers::is_slender(&cond_pl1_stem)
-        && !root.to_lowercase().ends_with("ae");
-
     v.cond.set_both(VerbPerson::Base, &suf(&f_stem, f_sl, "adh",   "eadh"));
     v.cond.set_both(VerbPerson::Sg1,  &suf(&f_stem, f_sl, "ainn",  "inn"));
     v.cond.set_both(VerbPerson::Sg2,  &suf(&f_stem, f_sl, "á",     "eá"));
-    v.cond.set_both(VerbPerson::Pl1,  &suf(&cond_pl1_stem, cond_pl1_sl, "aimis", "imis"));
+    v.cond.set_both(VerbPerson::Pl1,  &suf(&f_stem, f_sl, "aimis", "imis"));
     v.cond.set_both(VerbPerson::Pl3,  &suf(&f_stem, f_sl, "aidís", "idís"));
     v.cond.set_both(VerbPerson::Auto, &suf(&f_stem, f_sl, "aí",    "í"));
 
@@ -1324,6 +1317,1075 @@ fn xml_attrs(e: &quick_xml::events::BytesStart<'_>) -> std::collections::HashMap
         map.insert(key, val);
     }
     map
+}
+
+// ---------------------------------------------------------------------------
+// Verbal adjective generation (gnag rules)
+// ---------------------------------------------------------------------------
+
+// 1st-conj roots needing VA broadening that the conjugation predicates miss.
+// Includes both base and lenited forms so compounds match (e.g. aischuir).
+const VA_BROADEN_ROOTS: &[(&str, &str)] = &[
+    ("cuir", "cur"),   ("chuir", "chur"),
+    ("buair", "buar"),
+    ("mair", "mar"),   ("mhair", "mhar"),
+    ("coir", "cor"),   ("choir", "chor"),
+    ("scoir", "scor"), ("schoir", "schor"),
+    ("doir", "dor"),   ("dhoir", "dhor"),
+    ("goin", "gon"),   ("ghoin", "ghon"),
+    ("broim", "brom"),
+    ("uaim", "uam"),
+    ("foirceann", "foircean"),
+    ("tiomain", "tioman"), ("thiomain", "thioman"),
+    ("cinnir", "cinnear"),
+    ("cónaisc", "cónasc"),
+    ("déadail", "déadal"),
+];
+
+/// Irregular verbal adjective forms that can't be derived by rule.
+/// Sorted longest-suffix-first: if suffix A is a suffix of B, B must precede A.
+const VA_OVERRIDES: &[(&str, &str)] = &[
+    // 2nd conj: -thaigh/-thigh (VA strips past the -th)
+    ("lúthaigh", "lúite"),
+    ("dhathaigh", "dhaite"),
+    ("dlaoithigh", "dlaoithe"),
+    ("dathaigh", "daite"),
+    ("táthaigh", "táite"),
+    // 2nd conj: irregular stems
+    ("feallmharaigh", "feallmharfa"),
+    ("aiceannaigh", "aiceanta"),
+    ("míshásaigh", "míshásta"),
+    ("miadhaigh", "miadhuighthe"),
+    ("thadhaill", "thadhallta"),
+    ("tairngir", "tairngirithe"),
+    ("deachair", "deachraithe"),
+    ("freastail", "freastalta"),
+    ("líomhain", "líomhainte"),
+    ("tuargain", "tuargainte"),
+    ("stoithin", "stoithinte"),
+    ("tadhaill", "tadhallta"),
+    ("tafainn", "tafannta"),
+    ("taistil", "taistealta"),
+    ("cadhail", "caidhilte"),
+    ("codail", "codalta"),
+    ("innill", "innealta"),
+    ("locair", "locraithe"),
+    ("taitin", "taitnithe"),
+    ("inis", "inste"),
+    // 1st conj: -iaigh (strip -igh, broad suffix)
+    ("iaigh", "iata"),
+    // 1st conj: irregular -gh (non-standard strip or suffix)
+    ("comhthogh", "comhthofa"),
+    ("díbhlogh", "díbhloghta"),
+    ("diongaibh", "diongbháilte"),
+    ("guailleáil", "guilleáilte"),
+    ("fuirsigh", "fuirste"),
+    ("sleabhac", "sleabhctha"),
+    ("comhaill", "comhalta"),
+    ("creapaill", "creapalta"),
+    ("saighid", "saighdte"),
+    ("taighid", "taighdte"),
+    ("fadhbh", "fadhbhtha"),
+    ("scrabh", "scrabhaite"),
+    ("riagh", "riaghtha"),
+    ("blogh", "bloghta"),
+    ("aisig", "aiseagtha"),
+    ("clíth", "clite"),
+    ("glámh", "glámhtha"),
+    ("togh", "tofa"),
+    ("bogh", "boghtha"),
+    ("logh", "loghtha"),
+    ("rígh", "ríthe"),
+    // 1st conj: -th/-dh irregular (ite instead of ta, or strip -dh)
+    ("eisréidh", "eisréite"),
+    ("núth", "núite"),
+    ("dath", "daite"),
+    // 1st conj: -mhair false match with VA_BROADEN_ROOTS ("mhair"→"mhar")
+    ("chomhair", "chomhairthe"),
+    ("comhair", "comhairthe"),
+    // 1st conj: -mhain verb that broadens for VA (damhain does not)
+    ("tamhain", "tamhanta"),
+    // 1st conj: verbs where conjugation broadening is wrong for VA
+    ("teasairg", "teasairgthe"),
+    ("toirmisc", "toirmiscthe"),
+    ("dearlaic", "dearlaicthe"),
+    ("cumaisc", "cumaiscthe"),
+    ("agaill", "agaillte"),
+    ("buain", "buainte"),
+];
+
+fn va_stem_first(lemma: &str) -> String {
+    let l = lemma.to_lowercase();
+
+    for &(slender, broad) in VA_BROADEN_ROOTS {
+        if l.ends_with(slender) {
+            let prefix = &lemma[..lemma.len() - slender.len()];
+            return format!("{}{}", prefix, broad);
+        }
+    }
+
+    // annáil is the sole -áil verb that broadens for VA (pannáil etc. do not)
+    if l == "annáil" {
+        return opers::broaden(lemma);
+    }
+
+    // Conjugation broadening: correct for VA except monosyllabic -áil/-eáil
+    // with a vowel before the suffix (búáil, spraeáil etc. keep slender for VA)
+    if needs_broadening_first(lemma) {
+        let skip = !opers::polysyllabic(lemma) && ["áil", "eáil"].iter().any(|suf| {
+            l.ends_with(suf) && {
+                let before = &l[..l.len() - suf.len()];
+                before.chars().last().map_or(false, |c| opers::VOWELS.contains(c))
+            }
+        });
+        if !skip {
+            return opers::broaden(lemma);
+        }
+    }
+
+    if needs_syncope_first(lemma)
+        && !l.ends_with("mhain")
+        && !l.ends_with("eighil")
+        && !l.ends_with("uighill")
+    {
+        return opers::broaden(lemma);
+    }
+
+    if opers::polysyllabic(lemma) && !l.ends_with("iomáin") {
+        if l.ends_with("óil") || l.ends_with("úil")
+            || l.ends_with("áin") || l.ends_with("eáin")
+        {
+            return opers::broaden(lemma);
+        }
+    }
+
+    if lookup_deep_syncope(&l).is_some()
+        && !l.ends_with("adhain")
+        && !l.ends_with("deighil")
+        && !l.ends_with("comhair")
+    {
+        return opers::broaden(lemma);
+    }
+
+    lemma.to_string()
+}
+
+fn va_suffix(stem: &str) -> &'static str {
+    let l = stem.to_lowercase();
+
+    // Consonant cluster -rn follows the r-rule (tha/the), not n-rule (ta/te)
+    if l.ends_with("rn") {
+        return if opers::is_slender(stem) { "the" } else { "tha" };
+    }
+
+    // Digraphs
+    if l.ends_with("ch") {
+        return if opers::is_slender(stem) { "te" } else { "ta" };
+    }
+    if l.ends_with("dh") {
+        return if opers::is_slender(stem) { "te" } else { "ta" };
+    }
+
+    // Last character determines suffix class
+    let sl = opers::is_slender(stem);
+    match l.chars().last() {
+        Some('d' | 'l' | 'n' | 's' | 't') => if sl { "te" } else { "ta" },
+        Some('b' | 'c' | 'g' | 'm' | 'p' | 'r') => if sl { "the" } else { "tha" },
+        _ => if sl { "te" } else { "ta" },
+    }
+}
+
+fn va_first(lemma: &str) -> Option<String> {
+    let l = lemma.to_lowercase();
+
+    // saigh keeps the -gh in its VA (saighte, not saite)
+    if l == "saigh" {
+        return Some("saighte".to_string());
+    }
+
+    // -igh/-gh endings: strip -gh, add -te
+    if l.ends_with("gh") {
+        let base = &lemma[..lemma.len() - 2];
+        return Some(format!("{}te", base));
+    }
+
+    // -bh ending: strip bh, add fa/fe
+    if l.ends_with("bh") {
+        let base = &lemma[..lemma.len() - 2];
+        let sl = if opers::ends_vowel(base) {
+            base.chars().last().map_or(false, |c| "eiéí".contains(c))
+        } else {
+            opers::is_slender(base)
+        };
+        return Some(format!("{}{}", base, if sl { "fe" } else { "fa" }));
+    }
+
+    // -mh ending: strip mh, add fa/fe
+    if l.ends_with("mh") {
+        let base = &lemma[..lemma.len() - 2];
+        let sl = if opers::ends_vowel(base) {
+            base.chars().last().map_or(false, |c| "eiéí".contains(c))
+        } else {
+            opers::is_slender(base)
+        };
+        return Some(format!("{}{}", base, if sl { "fe" } else { "fa" }));
+    }
+
+    // -f ending: strip f, add fa
+    if l.ends_with('f') {
+        let base = &lemma[..lemma.len() - 1];
+        return Some(format!("{}fa", base));
+    }
+
+    // -th ending (but not -cht): strip th, add ta/te
+    if l.ends_with("th") && !l.ends_with("cht") {
+        let base = &lemma[..lemma.len() - 2];
+        let sl = if opers::ends_vowel(base) {
+            base.chars().last().map_or(false, |c| "eiéí".contains(c))
+        } else {
+            opers::is_slender(base)
+        };
+        return Some(format!("{}{}", base, if sl { "te" } else { "ta" }));
+    }
+
+    // Compute stem (possibly broadened)
+    let stem = va_stem_first(lemma);
+    let suffix = va_suffix(&stem);
+
+    // No double-t: stem ending in t + suffix starting with t → drop one
+    if l.ends_with('t') && suffix.starts_with('t') {
+        Some(format!("{}{}", stem, &suffix[1..]))
+    } else {
+        Some(format!("{}{}", stem, suffix))
+    }
+}
+
+fn va_second(lemma: &str) -> Option<String> {
+    let l = lemma.to_lowercase();
+
+    // -igh/-aigh: strip -gh, add -the
+    if l.ends_with("gh") {
+        let base = &lemma[..lemma.len() - 2];
+        return Some(format!("{}the", base));
+    }
+
+    // -il ending: stem + te (no depalatalisation)
+    if l.ends_with("il") {
+        return Some(format!("{}te", lemma));
+    }
+
+    // -is ending: stem + te
+    if l.ends_with("is") {
+        return Some(format!("{}te", lemma));
+    }
+
+    // -in ending: depalatalise + ta
+    if l.ends_with("in") {
+        let broad = opers::broaden(lemma);
+        return Some(format!("{}ta", broad));
+    }
+
+    // -ir ending: depalatalise + tha
+    if l.ends_with("ir") {
+        let broad = opers::broaden(lemma);
+        return Some(format!("{}tha", broad));
+    }
+
+    // -im ending: depalatalise + tha
+    if l.ends_with("im") {
+        let broad = opers::broaden(lemma);
+        return Some(format!("{}tha", broad));
+    }
+
+    // -ing ending: stem + the
+    if l.ends_with("ing") {
+        return Some(format!("{}the", lemma));
+    }
+
+    // Fallback: use 1st-conj-style suffix rules
+    let suffix = va_suffix(lemma);
+    Some(format!("{}{}", lemma, suffix))
+}
+
+const VA_EXACT: &[(&str, &str)] = &[
+    ("iopnóisigh", "hiopnóisithe"),
+    ("iodráitigh", "hiodráitithe"),
+    ("idriginigh", "hidriginithe"),
+    ("eilléanaigh", "Heilléanaithe"),
+    ("aigleáil", "haigleáilte"),
+    ("aicleáil", "haicleáilte"),
+    ("íleáil", "híleáilte"),
+    ("inigh", "hinithe"),
+    ("apáil", "hapáilte"),
+];
+
+fn generate_verbal_adjective(lemma: &str, class: VerbConjugationClass) -> Vec<Form> {
+    let l = lemma.to_lowercase();
+    for &(word, va_form) in VA_EXACT {
+        if l == word {
+            return vec![Form::new(va_form)];
+        }
+    }
+    for &(suffix, va_form) in VA_OVERRIDES {
+        if l.ends_with(suffix) {
+            let prefix = &lemma[..lemma.len() - suffix.len()];
+            let result = format!("{}{}", prefix, va_form);
+            return vec![Form::new(&result)];
+        }
+    }
+
+    let va = match class {
+        VerbConjugationClass::First => va_first(lemma),
+        VerbConjugationClass::Second => va_second(lemma),
+        VerbConjugationClass::Irregular => None,
+    };
+    va.map(|s| vec![Form::new(&s)]).unwrap_or_default()
+}
+
+// ---- Verbal noun generation ----
+
+/// Verbal noun overrides: suffix-matched, longest first.
+/// Compounds inherit root-verb VN via suffix matching.
+const VN_OVERRIDES: &[(&str, &str)] = &[
+    // -scríobh compounds: VN = lemma (12 verbs)
+    ("scríobh", "scríobh"),
+    // -gabh/-ghabh compounds: VN = root + -áil (9+1 verbs)
+    ("ghabh", "ghabháil"),
+    ("gabh", "gabháil"),
+    // -cuir/-chuir compounds: broaden → -cur/-chur (14 verbs)
+    ("chuir", "chur"),
+    ("cuir", "cur"),
+    // -tóg compounds: VN = root + -áil
+    ("tóg", "tógáil"),
+    // -déan/-dhéan compounds: VN = root + -amh
+    ("dhéan", "dhéanamh"),
+    ("déan", "déanamh"),
+    // -mheas compounds: VN = lemma
+    ("mheas", "mheas"),
+    // -coimhéad/-choimhéad: VN = lemma
+    ("choimhéad", "choimhéad"),
+    ("coimhéad", "coimhéad"),
+    // -íoc/-ísíoc: VN = lemma (but not slíoc/stríoc)
+    ("aisíoc", "aisíoc"),
+    ("réamhíoc", "réamhíoc"),
+    ("díshioc", "díshioc"),
+    ("íoc", "íoc"),
+    // -díol/-dhíol: VN = lemma
+    ("dhíol", "dhíol"),
+    ("díol", "díol"),
+    // -roinn: VN = -roinnt (but not sloinn)
+    ("sloinn", "sloinneadh"),
+    ("roinn", "roinnt"),
+    // -leag: VN = -leagan
+    ("leag", "leagan"),
+    // -teilg: VN = -teilgean
+    ("teilg", "teilgean"),
+    // -suigh/-shuigh: VN = strip -igh → -í
+    ("shuigh", "shuí"),
+    ("suigh", "suí"),
+    // -thit/-tit: VN = -titim
+    ("thit", "thitim"),
+    ("tit", "titim"),
+    // -scoir: VN = -scor
+    ("scoir", "scor"),
+    // -iompair: VN = -iompar
+    ("iompair", "iompar"),
+    // -tionóil: VN = -tionól
+    ("tionóil", "tionól"),
+    // -imir: VN = -imirt
+    ("imir", "imirt"),
+    // -ghair: VN = -ghairm (but not faghair/ionghair/urghair)
+    ("ionghair", "ionghaire"),
+    ("urghair", "urghaire"),
+    ("faghair", "faghairt"),
+    ("ghair", "ghairm"),
+    // -siúil: VN = -siúl
+    ("siúil", "siúl"),
+    // -ceangail/-cheangail: VN = -ceangal/-cheangal
+    ("cheangail", "cheangal"),
+    ("ceangail", "ceangal"),
+    // -soláthair: VN = -soláthar
+    ("soláthair", "soláthar"),
+    // -buail: VN = -bualadh
+    ("buail", "bualadh"),
+    // -fair: VN = -faire
+    ("cúlfhair", "cúlfhaire"),
+    ("fair", "faire"),
+    // -dáil (the verb dáil, not -dáil loanwords which are handled as -áil VN=lemma)
+    ("athdháil", "athdháileadh"),
+    // -buail/-bhuail: VN = -bualadh
+    ("bhuail", "bhualadh"),
+    ("buail", "bualadh"),
+    // VN=lemma compound families (safe suffix length)
+    ("bhruith", "bhruith"),
+    ("bruith", "bruith"),
+    ("ghoin", "ghoin"),
+    ("mheas", "mheas"),
+    ("choimhéad", "choimhéad"),
+    ("coimhéad", "coimhéad"),
+    ("oimeád", "oimeád"),
+    ("teagasc", "teagasc"),
+    ("aithris", "aithris"),
+    ("isnéis", "isnéis"),
+    ("úsáid", "úsáid"),
+    ("triail", "triail"),
+    ("riar", "riar"),
+    // Miscellaneous consistent families
+    ("druid", "druidim"),
+    ("crith", "crith"),
+    ("diall", "diall"),
+    ("triall", "triall"),
+    // -sheinn: VN = -sheinm
+    ("sheinn", "sheinm"),
+    ("seinn", "seinm"),
+    // -chuntais: VN = -chuntas
+    ("chuntais", "chuntas"),
+    ("cuntais", "cuntas"),
+    // 2nd conj -suigh/-shuigh/-luigh: strip -igh, add -í
+    ("shuigh", "shuí"),
+    ("suigh", "suí"),
+    ("luigh", "luí"),
+    // 2nd conj -éirigh: strip -igh, add -í
+    ("éirigh", "éirí"),
+    // 2nd conj -ionsaigh: strip -aigh, add -aí
+    ("ionsaigh", "ionsaí"),
+    // 2nd conj -igh → -í (monosyllabic & other specific verbs)
+    ("achainigh", "achainí"),
+    ("ceasnaigh", "ceasnaí"),
+    ("corraigh", "corraí"),
+    ("cónaigh", "cónaí"),
+    ("dligh", "dlí"),
+    ("dluigh", "dluí"),
+    ("eascainigh", "eascainí"),
+    ("fiafraigh", "fiafraí"),
+    ("fionraigh", "fionraí"),
+    ("guigh", "guí"),
+    ("impigh", "impí"),
+    ("snoigh", "snoí"),
+    ("taithigh", "taithí"),
+    // 2nd conj -ceannaigh: strip -aigh, add -ach
+    ("cheannaigh", "cheannach"),
+    ("ceannaigh", "ceannach"),
+    // 2nd conj -clúdaigh: strip -aigh, add -ach
+    ("chlúdaigh", "chlúdach"),
+    ("clúdaigh", "clúdach"),
+    // 2nd conj -réitigh: strip -igh, add -each
+    ("réitigh", "réiteach"),
+    // 2nd conj -igh → -ach (individual verbs)
+    ("amhastraigh", "amhastrach"),
+    ("aslaigh", "aslach"),
+    ("baslaigh", "baslach"),
+    ("báistigh", "báisteach"),
+    ("crústaigh", "crústach"),
+    ("cuardaigh", "cuardach"),
+    ("cumhdaigh", "cumhdach"),
+    ("díoscarnaigh", "díoscarnach"),
+    ("eitigh", "eiteach"),
+    ("fuadaigh", "fuadach"),
+    ("fuirigh", "fuireach"),
+    ("taifigh", "taifeach"),
+    ("taithmhigh", "taithmheach"),
+    ("toibhigh", "tobhach"),
+    ("éagnaigh", "éagnach"),
+    // 2nd conj -léigh → -léamh (compound family)
+    ("léigh", "léamh"),
+    // 2nd conj -smaoinigh → -smaoineamh
+    ("smaoinigh", "smaoineamh"),
+    // 2nd conj -machnaigh → -machnamh
+    ("mhachnaigh", "mhachnamh"),
+    ("machnaigh", "machnamh"),
+    // 2nd conj -igh → -eamh/-amh (individual verbs)
+    ("caidrigh", "caidreamh"),
+    ("cuimhnigh", "cuimhneamh"),
+    ("cúisigh", "cúiseamh"),
+    ("cúitigh", "cúiteamh"),
+    ("cúnaigh", "cúnamh"),
+    ("dealraigh", "dealramh"),
+    ("foighnigh", "foighneamh"),
+    ("fuaidrigh", "fuaidreamh"),
+    ("fritháirigh", "fritháireamh"),
+    ("foréiligh", "foréileamh"),
+    ("frithéiligh", "frithéileamh"),
+    ("míshásaigh", "míshásamh"),
+    ("sásaigh", "sásamh"),
+    ("taibhrigh", "taibhreamh"),
+    ("táinsigh", "táinseamh"),
+    ("téarnaigh", "téarnamh"),
+    ("tórraigh", "tórramh"),
+    ("áirigh", "áireamh"),
+    // 2nd conj -igh → -chan (vowel + -igh → strip, long vowel + -chan)
+    ("beoigh", "beochan"),
+    ("cruaigh", "cruachan"),
+    ("dubhaigh", "dúchan"),
+    ("buaigh", "buachan"),
+    ("ruaigh", "ruachan"),
+    ("láigh", "láchan"),
+    ("tiubhaigh", "tiúchan"),
+    // 2nd conj misc -igh overrides
+    ("admhaigh", "admháil"),
+    ("airigh", "aireachtáil"),
+    ("coinnigh", "coinneáil"),
+    ("sholáthraigh", "sholáthar"),
+    ("soláthraigh", "soláthar"),
+    // 2nd conj -igh → -eacht
+    ("dhúisigh", "dhúiseacht"),
+    ("dúisigh", "dúiseacht"),
+    ("aoirigh", "aoireacht"),
+    ("mháistrigh", "mháistreacht"),
+    ("máistrigh", "máistreacht"),
+    // 2nd conj -igh → -iúint
+    ("eisigh", "eisiúint"),
+    // --- Compound families: -scaoil → -scaoileadh (NOT -scaoilt) ---
+    ("scaoil", "scaoileadh"),
+    // --- Compound families: -fuaigh → -fuáil ---
+    ("fhuaigh", "fhuáil"),
+    ("fuaigh", "fuáil"),
+    // --- Compound families: -teilg → -teilgean ---
+    // already have ("teilg", "teilgean") above
+    // --- Compound families: -lig/-eislig → -ligean ---
+    ("eislig", "eisligean"),
+    ("folig", "foligean"),
+    ("tarmlig", "tarmligean"),
+    ("lig", "ligean"),
+    // --- 1st conj -isc/-áisc → broaden: drop slender, -scadh ---
+    // These verbs slenderize the -sc cluster; VN broadens it back
+    ("loisc", "loscadh"),
+    ("fháisc", "fháscadh"),
+    ("fáisc", "fáscadh"),
+    ("rúisc", "rúscadh"),
+    ("brúisc", "brúscadh"),
+    ("coisc", "cosc"),
+    ("cónaisc", "cónascadh"),
+    // --- 1st conj -aic/-aisc → broadened (comhrac, cumasc, etc.) ---
+    ("comhraic", "comhrac"),
+    ("cumaisc", "cumasc"),
+    ("iomlaisc", "iomlasc"),
+    ("toirmisc", "toirmeasc"),
+    ("urchoisc", "urchosc"),
+    ("tochais", "tochas"),
+    ("tochrais", "tochras"),
+    ("díthochais", "díthochas"),
+    ("díthochrais", "díthochras"),
+    ("tomhais", "tomhas"),
+    ("fómhais", "fómhas"),
+    ("urmhais", "urmhaise"),
+    ("súraic", "súrac"),
+    // --- 1st conj -loit/-aghloit → broadened -lot/-aghlot ---
+    ("loit", "lot"),
+    // --- -glaoigh → -glaoch ---
+    ("ghlaoigh", "ghlaoch"),
+    ("glaoigh", "glaoch"),
+    // --- -pléigh → -phlé (strip -igh, long vowel root) ---
+    ("phléigh", "phlé"),
+    ("pléigh", "plé"),
+    // --- -beoigh/-reoigh/-dreoigh/-feoigh/-sceoigh/-glaeigh/-breoigh → strip -igh ---
+    ("beoigh", "beo"),
+    ("bheoigh", "bheochan"),
+    ("reoigh", "reo"),
+    ("dreoigh", "dreo"),
+    ("feoigh", "feo"),
+    ("sceoigh", "sceo"),
+    ("glaeigh", "glae"),
+    ("breoigh", "breo"),
+    ("díreoigh", "díreo"),
+    ("athreoigh", "athreo"),
+    // --- -igh → -ígheadh (some long-root first conj) ---
+    ("rígh", "rí"),
+    ("athrígh", "athrí"),
+    ("cloígh", "cloí"),
+    ("cnaígh", "cnaí"),
+    ("maígh", "maíomh"),
+    // --- 1st conj -ith/-eith/-aith → broadened -amh/adh forms ---
+    ("chaith", "chaitheamh"),
+    ("caith", "caitheamh"),
+    ("maith", "maitheamh"),
+    ("braith", "brath"),
+    ("scraith", "scrathadh"),
+    ("snáith", "snáthadh"),
+    ("feith", "feitheamh"),
+    // --- 1st conj -idh → broadened -dh forms ---
+    ("luaidh", "luadh"),
+    ("iomráidh", "iomrádh"),
+    ("claidh", "claidhe"),
+    ("slaidh", "slaidhe"),
+    ("eisréidh", "eisréadh"),
+    ("leoidh", "leodh"),
+    // --- 1st conj -ibh → -ibhe ---
+    ("ibh", "ibhe"),
+    ("díbh", "díbhe"),
+    ("diongaibh", "diongbháil"),
+    // --- 2nd conj -airigh → -airiú (not -aireamh) ---
+    ("allmhairigh", "allmhairiú"),
+    ("athallmhairigh", "athallmhairiú"),
+    ("athonnmhairigh", "athonnmhairiú"),
+    ("onnmhairigh", "onnmhairiú"),
+    ("ríomhairigh", "ríomhairiú"),
+    ("guairigh", "guairiú"),
+    ("lúcháirigh", "lúcháiriú"),
+    ("náirigh", "náiriú"),
+    ("adhnáirigh", "adhnáiriú"),
+    ("eiseamláirigh", "eiseamláiriú"),
+    // 2nd conj -léirigh → -léiriú
+    ("léirigh", "léiriú"),
+    // 2nd conj specific -igh → -iú (not default -iúint or -í)
+    ("athdheisigh", "athdheisiú"),
+    ("deisigh", "deisiú"),
+    ("breisigh", "breisiú"),
+    ("treisigh", "treisiú"),
+    ("cleitigh", "cleitiú"),
+    ("coincréitigh", "coincréitiú"),
+    ("díréitigh", "díréitiú"),
+    ("geoidligh", "geoidliú"),
+    ("polaiméirigh", "polaiméiriú"),
+    ("sionsaigh", "sionsú"),
+    // 2nd conj -aigh → -ú (not -ach)
+    ("aiceannaigh", "aiceannú"),
+    ("ailtéarnaigh", "ailtéarnú"),
+    ("bréagnaigh", "bréagnú"),
+    ("céaslaigh", "céaslú"),
+    ("diamhaslaigh", "diamhaslú"),
+    ("maslaigh", "maslú"),
+    ("tréaslaigh", "tréaslú"),
+    ("reoánaigh", "reoánanú"),
+    // 2nd conj -aigh → -aíocht/-aí (activity nouns)
+    ("marcaigh", "marcaíocht"),
+    ("rothaigh", "rothaíocht"),
+    ("rámhaigh", "rámhaíocht"),
+    ("tóraigh", "tóraíocht"),
+    ("coisigh", "coisíocht"),
+    ("osnaigh", "osnaíl"),
+    // 2nd conj -aigh → -acht/-t special
+    ("damhsaigh", "damhsa"),
+    ("cniogdhamhsaigh", "cniogdhamhsa"),
+    ("fortaigh", "fortacht"),
+    ("tathantaigh", "tathant"),
+    ("teastaigh", "teastáil"),
+    ("teagmhaigh", "teagmháil"),
+    ("giollaigh", "giollacht"),
+    // 2nd conj -igh → -eacht special
+    ("imigh", "imeacht"),
+    ("mainnigh", "mainneachtain"),
+    ("tairngir", "tairngireacht"),
+    ("gibir", "gibreacht"),
+    // 2nd conj: -aigh → special -ughadh (miadhaigh)
+    ("miadhaigh", "miadhughadh"),
+    // 2nd conj -ir → broadened (not -irt)
+    ("bladair", "bladar"),
+    ("cogair", "cogar"),
+    ("tacair", "tacar"),
+    ("togair", "togradh"),
+    ("athrómhair", "athrómhar"),
+    ("rómhair", "rómhar"),
+    ("iomair", "iomramh"),
+    // 2nd conj -ir → -radh (syncope)
+    ("bladhair", "bladhradh"),
+    ("bodhair", "bodhradh"),
+    ("cabhair", "cabhradh"),
+    ("cnámhair", "cnáimhreadh"),
+    ("gleadhair", "gleadhradh"),
+    ("leadair", "leadradh"),
+    ("lochair", "lochradh"),
+    ("sciomair", "sciomradh"),
+    ("siabhair", "siabhradh"),
+    ("tionnabhair", "tionnabhradh"),
+    ("deachair", "deachrú"),
+    ("locair", "locrú"),
+    ("torchair", "torchra"),
+    // 2nd conj -il → broadened (not -ilt)
+    ("codail", "codladh"),
+    ("cadhail", "caidhleadh"),
+    ("freastail", "freastal"),
+    ("gogail", "gogal"),
+    ("maoscail", "maoscal"),
+    ("scobail", "scobladh"),
+    ("sárthadhaill", "sárthadhall"),
+    ("tadhaill", "tadhall"),
+    ("taistil", "taisteal"),
+    ("tochsail", "tochsal"),
+    ("comhaill", "comhall"),
+    ("fuighill", "fuigheall"),
+    ("sroighill", "sroighleadh"),
+    ("insamhail", "insamhladh"),
+    ("déadail", "déadladh"),
+    // 2nd conj -in → special (not -int)
+    ("ascain", "ascnamh"),
+    ("foscain", "foscnamh"),
+    ("tionscain", "tionscnamh"),
+    ("taitin", "taitneamh"),
+    ("stoithin", "stoithneadh"),
+    ("tafainn", "tafann"),
+    ("ionnail", "ionladh"),
+    ("innill", "inleadh"),
+    // 2nd conj -is → special (not VN=lemma)
+    ("athinis", "athinsint"),
+    ("réamhinis", "réamhinsint"),
+    ("inis", "insint"),
+    // 2nd conj -ir special
+    ("athfhaghair", "athfhaghairt"),
+    ("coimpir", "coimpeart"),
+    // 2nd conj: -iúint verbs
+    ("glinnigh", "glinniúint"),
+    // 2nd conj: -eamh verbs (2nd conj -cúisigh → -cúiseamh)
+    ("díotchúisigh", "díotchúiseamh"),
+    ("ionchúisigh", "ionchúiseamh"),
+    // 2nd conj: fuirsigh, special -igh → -eadh
+    ("fuirsigh", "fuirseadh"),
+    // 2nd conj: maistrigh → maistreadh
+    ("maistrigh", "maistreadh"),
+    // 2nd conj: fordhubhaigh → fordhúchan
+    ("fordhubhaigh", "fordhúchan"),
+    ("eispéirigh", "eispéiriú"),
+    ("doiléirigh", "doiléiriú"),
+    ("athléirigh", "athléiriú"),
+    ("forléirigh", "forléiriú"),
+    ("soiléirigh", "soiléiriú"),
+    // 2nd conj: tacmhaing → tacmhang
+    ("tacmhaing", "tacmhang"),
+];
+
+fn vn_first(lemma: &str) -> Option<String> {
+    let l = lemma.to_lowercase();
+
+    // -áil/-eáil verbs: VN = lemma
+    if l.ends_with("áil") || l.ends_with("eáil") {
+        return Some(lemma.to_string());
+    }
+
+    // -igh verbs (monosyllabic in 1st conj)
+    if l.ends_with("igh") {
+        let root = &lemma[..lemma.len() - 3];
+        let root_l = &l[..l.len() - 3];
+        // Long vowel root: strip -igh (dóigh→dó, luaigh→lua)
+        if root_l.ends_with(|c: char| "áéíóú".contains(c))
+            || root_l.ends_with("ua")
+            || root_l.ends_with("ao")
+        {
+            return Some(root.to_string());
+        }
+        // Short vowel root: strip -igh, add -í (suigh→suí, nigh→ní)
+        return Some(format!("{}í", root));
+    }
+
+    // 1st conj verbs ending in -il/-in/-ir/-ain/-áin/-óin/-ing/-im:
+    // VN = lemma + -t (same pattern as 2nd conj -il/-in/-ir)
+    // adhain→adhaint, argóin→argóint, labhair→labhairt, oscail→oscailt
+    if l.ends_with("il") || l.ends_with("in") || l.ends_with("ir")
+        || l.ends_with("im") || l.ends_with("ing")
+    {
+        return Some(format!("{}t", lemma));
+    }
+
+    // Default: broaden + -adh (broad) or stem + -eadh (slender)
+    let stem = if needs_broadening_first(lemma) {
+        opers::broaden(lemma)
+    } else if needs_syncope_first(lemma) {
+        opers::broaden(lemma)
+    } else {
+        lemma.to_string()
+    };
+
+    if opers::is_slender(&stem) {
+        Some(format!("{}eadh", stem))
+    } else {
+        Some(format!("{}adh", stem))
+    }
+}
+
+fn vn_second(lemma: &str) -> Option<String> {
+    let l = lemma.to_lowercase();
+
+    // -áil/-eáil verbs: VN = lemma
+    if l.ends_with("áil") || l.ends_with("eáil") {
+        return Some(lemma.to_string());
+    }
+
+    // -aigh: strip -aigh, add -ú (achtaigh → achtú)
+    // -igh (non-aigh): strip -igh, add -iú (Laidinigh → Laidiniú)
+    if l.ends_with("aigh") {
+        let base = &lemma[..lemma.len() - 4];
+        return Some(format!("{}ú", base));
+    }
+    if l.ends_with("igh") {
+        let base = &lemma[..lemma.len() - 3];
+        return Some(format!("{}iú", base));
+    }
+
+    // -il/-in/-ir/-im: lemma + -t (oscail→oscailt, imir→imirt, agair→agairt)
+    if l.ends_with("il") || l.ends_with("in") || l.ends_with("ir") || l.ends_with("im") {
+        return Some(format!("{}t", lemma));
+    }
+
+    // -is: VN = lemma (aithris→aithris)
+    if l.ends_with("is") {
+        return Some(lemma.to_string());
+    }
+
+    // -ing: lemma + -t
+    if l.ends_with("ing") {
+        return Some(format!("{}t", lemma));
+    }
+
+    // Fallback
+    if opers::is_slender(lemma) {
+        Some(format!("{}eadh", lemma))
+    } else {
+        Some(format!("{}adh", lemma))
+    }
+}
+
+const VN_EXACT: &[(&str, &str)] = &[
+    // Standalone verbs with VN=lemma
+    ("achomharc", "achomharc"), ("agóid", "agóid"), ("amharc", "amharc"),
+    ("aisíoc", "aisíoc"), ("aisléim", "aisléim"), ("aisling", "aisling"),
+    ("aitheasc", "aitheasc"), ("barúil", "barúil"), ("broic", "broic"),
+    ("buain", "buain"), ("bruíon", "bruíon"), ("cac", "cac"),
+    ("casaoid", "casaoid"), ("clíth", "clíth"), ("conspóid", "conspóid"),
+    ("dearmad", "dearmad"), ("díol", "díol"), ("díon", "díon"),
+    ("díoghail", "díoghail"), ("díolaim", "díolaim"), ("díospóid", "díospóid"),
+    ("díshioc", "díshioc"), ("diúl", "diúl"), ("dord", "dord"),
+    ("dréim", "dréim"), ("éag", "éag"), ("faichill", "faichill"),
+    ("faisnéis", "faisnéis"), ("fás", "fás"), ("feighil", "feighil"),
+    ("fiach", "fiach"), ("foghlaim", "foghlaim"), ("gad", "gad"),
+    ("gearán", "gearán"), ("goid", "goid"), ("idircheart", "idircheart"),
+    ("inghreim", "inghreim"), ("lámhach", "lámhach"), ("leigheas", "leigheas"),
+    ("léim", "léim"), ("léirscrios", "léirscrios"), ("líomhain", "líomhain"),
+    ("lorg", "lorg"), ("meath", "meath"), ("mún", "mún"),
+    ("ól", "ól"), ("pocléim", "pocléim"), ("reic", "reic"),
+    ("réamhíoc", "réamhíoc"), ("rith", "rith"), ("ríomh", "ríomh"),
+    ("seilg", "seilg"), ("sioc", "sioc"), ("slad", "slad"),
+    ("snámh", "snámh"), ("sníomh", "sníomh"), ("stad", "stad"),
+    ("tathaoir", "tathaoir"), ("teip", "teip"), ("toghail", "toghail"),
+    ("tomhaidhm", "tomhaidhm"), ("tonach", "tonach"),
+    ("tost", "tost"), ("trácht", "trácht"), ("tréthál", "tréthál"),
+    ("triosc", "triosc"), ("troid", "troid"), ("trust", "trust"),
+    ("tuar", "tuar"), ("tál", "tál"), ("tóch", "tóch"),
+    ("urbhac", "urbhac"), ("íoc", "íoc"),
+    // Standalone verb overrides
+    ("dáil", "dáileadh"),
+    ("annáil", "annáladh"),
+    ("figh", "fí"), ("ligh", "lí"), ("nigh", "ní"), ("snigh", "sní"),
+    ("faigh", "fáil"),
+    ("righ", "ríochan"),
+    ("éiligh", "éileamh"),
+    ("iaigh", "iamh"), ("eisiaigh", "eisiamh"),
+    ("foriaigh", "foriamh"), ("iniaigh", "iniamh"),
+    // 1st conj -ir/-il that DON'T take -t (irregular stem changes)
+    ("air", "ar"),
+    ("athghoin", "athghoin"),
+    // 1st conj irregular VN singletons
+    ("adhair", "adhradh"),
+    ("agaill", "agallamh"),
+    ("aghloit", "aghlot"),
+    ("ainic", "anacal"),
+    ("aisig", "aiseag"),
+    ("arg", "argain"),
+    ("bligh", "bleán"),
+    ("broim", "bromadh"),
+    ("buair", "buaireamh"),
+    ("buígh", "buíochan"),
+    ("búir", "búireadh"),
+    ("caoin", "caoineadh"),
+    ("car", "carthain"),
+    ("ceiliúir", "ceiliúradh"),
+    ("ceis", "ceasacht"),
+    ("cin", "cineadh"),
+    ("cinnir", "cinnireacht"),
+    ("cling", "clingeadh"),
+    ("cnead", "cneadach"),
+    ("coir", "cor"),
+    ("coisric", "coisreacan"),
+    ("comhair", "comhaireamh"),
+    ("athchomhair", "athchomhaireamh"),
+    ("comóir", "comóradh"),
+    ("comhthiúin", "comhthiúnadh"),
+    ("creid", "creidiúint"),
+    ("díchreid", "díchreidiúint"),
+    ("creim", "creimeadh"),
+    ("cráin", "cráineadh"),
+    ("cáin", "cáineadh"),
+    ("damhain", "damhnadh"),
+    ("deil", "deileadh"),
+    ("deimhneasc", "deimhneasc"),
+    ("ding", "dingeadh"),
+    ("doir", "dor"),
+    ("dámh", "dámhachtain"),
+    ("eisiacht", "eisiachtain"),
+    ("eisil", "eisileadh"),
+    ("fan", "fanacht"),
+    ("feil", "feiliúint"),
+    ("feir", "feireadh"),
+    ("fionnachtain", "fionnachtaineadh"),
+    ("fodháil", "fodháileadh"),
+    ("imdháil", "imdháileadh"),
+    ("leithdháil", "leithdháileadh"),
+    ("folean", "foleanúint"),
+    ("fordhing", "fordhingeadh"),
+    ("forthairg", "forthairiscint"),
+    ("fuill", "fuilleamh"),
+    ("fuin", "fuineadh"),
+    ("fág", "fágáil"),
+    ("fáir", "fáireadh"),
+    ("féach", "féachaint"),
+    ("féad", "féadachtáil"),
+    ("fóin", "fónamh"),
+    ("fóir", "fóirithint"),
+    ("gair", "gairm"),
+    ("gin", "giniúint"),
+    ("athghin", "athghiniúint"),
+    ("glam", "glamaíl"),
+    ("glean", "gleanúint"),
+    ("nasclean", "nascleanúint"),
+    ("gluais", "gluaiseacht"),
+    ("toghluais", "toghluasacht"),
+    ("goil", "gol"),
+    ("goin", "goin"),
+    ("gáir", "gáire"),
+    ("géim", "géimneach"),
+    ("iarr", "iarraidh"),
+    ("iasc", "iascach"),
+    ("imdheaghail", "imdheaghail"),
+    ("imdhruid", "imdhruidim"),
+    ("imthnúth", "imthnúth"),
+    ("insil", "insileadh"),
+    ("lean", "leanúint"),
+    ("ling", "lingeadh"),
+    ("mair", "maireachtáil"),
+    ("meas", "meas"),
+    ("míriar", "míriaradh"),
+    ("múin", "múineadh"),
+    ("oil", "oiliúint"),
+    ("athoil", "athoiliúint"),
+    ("oir", "oiriúint"),
+    ("oiris", "oiriseamh"),
+    ("tairis", "tairiseamh"),
+    ("pláigh", "plá"),
+    ("truaigh", "trua"),
+    ("rinc", "rince"),
+    ("saigh", "saighe"),
+    ("saighid", "saighdeadh"),
+    ("sceamh", "sceamhaíl"),
+    ("scil", "scileadh"),
+    ("scread", "screadach"),
+    ("scréach", "scréachach"),
+    ("scáin", "scáineadh"),
+    ("seas", "seasamh"),
+    ("sil", "sileadh"),
+    ("sir", "sireadh"),
+    ("diansir", "diansireadh"),
+    ("sligh", "slighe"),
+    ("slíoc", "slíocadh"),
+    ("stríoc", "stríocadh"),
+    ("spadhar", "spadhradh"),
+    ("speir", "speireadh"),
+    ("stiúir", "stiúradh"),
+    ("substain", "substaineadh"),
+    ("síobshiúil", "síobshiúl"),
+    ("taighid", "taighde"),
+    ("tairg", "tairiscint"),
+    ("garbhtheilg", "garbhtheilgean"),
+    ("dísletheilg", "dísletheilgean"),
+    ("imthairg", "imthairiscint"),
+    ("réamhtheilg", "réamhtheilgean"),
+    ("rótheilg", "rótheilgean"),
+    ("tíoptheilg", "tíoptheilgean"),
+    ("tamhain", "tamhnadh"),
+    ("teasairg", "teasargan"),
+    ("til", "tileadh"),
+    ("tionlaic", "tionlacan"),
+    ("tiúin", "tiúnadh"),
+    ("tnúth", "tnúth"),
+    ("tonnchrith", "tonnchrith"),
+    ("treapáin", "treapánadh"),
+    ("tréig", "tréigean"),
+    ("tubh", "tubha"),
+    ("tuig", "tuiscint"),
+    ("tuil", "tuile"),
+    ("tuill", "tuilleamh"),
+    ("táir", "táireadh"),
+    ("uaim", "uamadh"),
+    ("urlaic", "urlacan"),
+    ("sleabhac", "sleabhcadh"),
+    ("éagaoin", "éagaoineadh"),
+    ("éist", "éisteacht"),
+    ("athéist", "athéisteacht"),
+    ("cúléist", "cúléisteacht"),
+    ("úim", "úmadh"),
+    // h-prothesis VN (BuNaMo stores h-prefixed form)
+    ("aicleáil", "haicleáil"),
+    ("aigleáil", "haigleáil"),
+    ("apáil", "hapáil"),
+    ("íleáil", "híleáil"),
+    // 1st conj -igh compounds classified as 1st conj
+    ("athbheoigh", "athbheochan"),
+    ("athnuaigh", "athnuachan"),
+    ("creapaill", "creapall"),
+    ("díchoisric", "díchoisreacan"),
+    // -éigh → -éamh (not strip-igh; these want root+amh)
+    ("éigh", "éamh"),
+    ("atéigh", "atéamh"),
+    ("forthéigh", "forthéamh"),
+    ("róthéigh", "róthéamh"),
+    // Specific -igh singletons
+    ("rígh", "rí"),
+    ("athrígh", "athrí"),
+    ("cloígh", "cloí"),
+    ("cnaígh", "cnaí"),
+    ("maígh", "maíomh"),
+    ("buígh", "buíochan"),
+    ("pláigh", "plá"),
+    ("truaigh", "trua"),
+    // Remaining singletons
+    ("tibh", "tibheadh"),
+    ("scillig", "scilligeadh"),
+    ("troisc", "troscadh"),
+    // 2nd conj singletons not covered by suffix patterns
+    ("athstóraigh", "athstórú"),
+    ("gluaisrothaigh", "gluaisrothú"),
+    ("caithréimigh", "caithréimiú"),
+    ("caochfháithimigh", "caochfháithimiú"),
+    ("cimigh", "cimiú"),
+    ("comhshuimigh", "comhshuimiú"),
+    ("ionstraimigh", "ionstraimiú"),
+    ("suimigh", "suimiú"),
+    ("tuairimigh", "tuairimiú"),
+    ("éimigh", "éimiú"),
+    ("imaistrigh", "imaistriú"),
+    ("eilléanaigh", "Heilléanú"),
+    // h-prothesis 2nd conj VN
+    ("idriginigh", "hidriginiú"),
+    ("inigh", "hiniú"),
+    ("iodráitigh", "hiodráitiú"),
+    ("iopnóisigh", "hiopnóisiú"),
+];
+
+fn generate_verbal_noun(lemma: &str, class: VerbConjugationClass) -> Vec<Form> {
+    let l = lemma.to_lowercase();
+    for &(word, vn_form) in VN_EXACT {
+        if l == word {
+            return vec![Form::new(vn_form)];
+        }
+    }
+    // Find longest matching suffix (most specific wins)
+    let mut best: Option<(&str, &str)> = None;
+    for &(suffix, vn_form) in VN_OVERRIDES {
+        if l.ends_with(suffix) {
+            if best.map_or(true, |(s, _)| suffix.len() > s.len()) {
+                best = Some((suffix, vn_form));
+            }
+        }
+    }
+    if let Some((suffix, vn_form)) = best {
+        let prefix = &lemma[..lemma.len() - suffix.len()];
+        let result = format!("{}{}", prefix, vn_form);
+        return vec![Form::new(&result)];
+    }
+
+    let vn = match class {
+        VerbConjugationClass::First => vn_first(lemma),
+        VerbConjugationClass::Second => vn_second(lemma),
+        VerbConjugationClass::Irregular => None,
+    };
+    vn.map(|s| vec![Form::new(&s)]).unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -2112,10 +3174,31 @@ mod tests {
     }
 
     #[test]
-    fn test_leigh_cond_pl1_contraction() {
+    fn test_leigh_cond_pl1() {
         let v = Verb::from_lemma("léigh", VerbConjugationClass::First);
-        assert_eq!(f(&v.cond.indep.pl1),  "léfimis");
+        assert_eq!(f(&v.cond.indep.pl1),  "léifimis");
         assert_eq!(f(&v.fut.indep.base),  "léifidh");
+    }
+
+    #[test]
+    fn test_deep_syncope_bunamo() {
+        let v = Verb::from_lemma("achair", VerbConjugationClass::First);
+        assert_eq!(f(&v.fut.indep.base),          "acharfaidh");
+        assert_eq!(f(&v.cond.indep.base),         "acharfadh");
+        assert_eq!(f(&v.pres_cont.indep.auto),    "achairtear");
+        assert_eq!(f(&v.past_cont.indep.sg2),     "achartá");
+
+        let v = Verb::from_lemma("adhain", VerbConjugationClass::First);
+        assert_eq!(f(&v.fut.indep.base),          "adhanfaidh");
+        assert_eq!(f(&v.cond.indep.base),         "adhnfadh");
+    }
+
+    #[test]
+    fn test_deighil_gnag_future() {
+        let v = Verb::from_lemma("deighil", VerbConjugationClass::First);
+        assert_eq!(f(&v.fut.indep.base),          "deighilfidh");
+        assert_eq!(f(&v.cond.indep.base),         "deighilfeadh");
+        assert_eq!(f(&v.pres_cont.indep.auto),    "deighltear");
     }
 
     #[test]
@@ -2136,5 +3219,52 @@ mod tests {
     fn test_tarlaigh_past_base() {
         let v = Verb::from_lemma("tarlaigh", VerbConjugationClass::Second);
         assert_eq!(f(&v.past.indep.base), "tarla");
+    }
+
+    #[test]
+    fn test_verbal_adjective_first_conj() {
+        // Basic consonant endings
+        assert_eq!(f(&Verb::from_lemma("glan", VerbConjugationClass::First).verbal_adjective), "glanta");
+        assert_eq!(f(&Verb::from_lemma("bris", VerbConjugationClass::First).verbal_adjective), "briste");
+        assert_eq!(f(&Verb::from_lemma("mol", VerbConjugationClass::First).verbal_adjective), "molta");
+        assert_eq!(f(&Verb::from_lemma("gearr", VerbConjugationClass::First).verbal_adjective), "gearrtha");
+        assert_eq!(f(&Verb::from_lemma("fág", VerbConjugationClass::First).verbal_adjective), "fágtha");
+        assert_eq!(f(&Verb::from_lemma("ceap", VerbConjugationClass::First).verbal_adjective), "ceaptha");
+
+        // -igh: strip -gh + te
+        assert_eq!(f(&Verb::from_lemma("léigh", VerbConjugationClass::First).verbal_adjective), "léite");
+        assert_eq!(f(&Verb::from_lemma("dóigh", VerbConjugationClass::First).verbal_adjective), "dóite");
+
+        // -bh/-mh: strip + fa
+        assert_eq!(f(&Verb::from_lemma("scríobh", VerbConjugationClass::First).verbal_adjective), "scríofa");
+        assert_eq!(f(&Verb::from_lemma("snámh", VerbConjugationClass::First).verbal_adjective), "snáfa");
+
+        // -th: strip + ta/te
+        assert_eq!(f(&Verb::from_lemma("caith", VerbConjugationClass::First).verbal_adjective), "caite");
+        assert_eq!(f(&Verb::from_lemma("ith", VerbConjugationClass::First).verbal_adjective), "ite");
+
+        // Broadened stems
+        assert_eq!(f(&Verb::from_lemma("cuir", VerbConjugationClass::First).verbal_adjective), "curtha");
+        assert_eq!(f(&Verb::from_lemma("goin", VerbConjugationClass::First).verbal_adjective), "gonta");
+        assert_eq!(f(&Verb::from_lemma("taispeáin", VerbConjugationClass::First).verbal_adjective), "taispeánta");
+
+        // No double-t
+        assert_eq!(f(&Verb::from_lemma("alt", VerbConjugationClass::First).verbal_adjective), "alta");
+    }
+
+    #[test]
+    fn test_verbal_adjective_second_conj() {
+        // -igh: strip -gh + the
+        assert_eq!(f(&Verb::from_lemma("salaigh", VerbConjugationClass::Second).verbal_adjective), "salaithe");
+        assert_eq!(f(&Verb::from_lemma("coinnigh", VerbConjugationClass::Second).verbal_adjective), "coinnithe");
+
+        // -il: stem + te
+        assert_eq!(f(&Verb::from_lemma("oscail", VerbConjugationClass::Second).verbal_adjective), "oscailte");
+
+        // -in: broaden + ta
+        assert_eq!(f(&Verb::from_lemma("imir", VerbConjugationClass::Second).verbal_adjective), "imeartha");
+
+        // -im: broaden + tha
+        assert_eq!(f(&Verb::from_lemma("foghlaim", VerbConjugationClass::Second).verbal_adjective), "foghlamtha");
     }
 }
