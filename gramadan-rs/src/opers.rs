@@ -616,8 +616,8 @@ pub fn syncope(base: &str) -> String {
             .iter()
             .any(|pair| result.contains(pair))
         {
-            // Exceptions
-            if result == "codladh" || result == "caibidl" {
+            // Exceptions: keep dl intact in codl-/caibidl
+            if result.starts_with("codl") || result == "caibidl" {
                 return result;
             }
             // Find the prefix that is unchanged between base and result

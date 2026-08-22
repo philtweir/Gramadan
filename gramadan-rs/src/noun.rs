@@ -14,8 +14,8 @@ use regex::Regex;
 pub struct Noun {
     pub sg_nom: Vec<FormSg>,
     pub sg_gen: Vec<FormSg>,
-    pub sg_voc: Vec<Form>,
-    pub sg_dat: Vec<Form>,
+    pub sg_voc: Vec<FormSg>,
+    pub sg_dat: Vec<FormSg>,
     pub pl_nom: Vec<Form>,
     pub pl_gen: Vec<FormPlGen>,
     pub pl_voc: Vec<Form>,
@@ -64,10 +64,10 @@ impl Noun {
             noun.sg_gen.push(FormSg::new(&f.value, si.gender));
         }
         for f in &si.vocative {
-            noun.sg_voc.push(Form::new(&f.value));
+            noun.sg_voc.push(FormSg::new(&f.value, si.gender));
         }
         for f in &si.dative {
-            noun.sg_dat.push(Form::new(&f.value));
+            noun.sg_dat.push(FormSg::new(&f.value, si.gender));
         }
 
         if let Some(pi) = pi {
@@ -84,7 +84,7 @@ impl Noun {
 
         if noun.sg_dat.is_empty() {
             for f in &noun.sg_nom {
-                noun.sg_dat.push(Form::new(&f.value));
+                noun.sg_dat.push(FormSg::new(&f.value, f.gender));
             }
         }
 
@@ -381,7 +381,7 @@ const FULLY_IRREGULAR: &[(&str, (i8, &str))] = &[
     ("conradh", (3, "conartha")),
     ("cumhachtroinnt", (3, "cumhachtroinnte")),
     ("bunmhúinteoir", (3, "bunmhuinteora")),
-    ("cion", (3, "ciona")),
+    ("cuach", (3, "cuach")),
     ("cosaint", (3, "cosanta")),
     ("dioc", (3, "dioca")),
     ("siorc", (3, "siorca")),
@@ -455,9 +455,7 @@ const IRREGULAR_DECLENSION_BASE: &[(&str, &str)] = &[
     ("deoch", "dí"),
     ("siúr", "siúrach"),
     ("dia", "dé"),
-    ("lá", "lae"),
     ("leaba", "leapa"),
-    ("mí", "míosa"),
     ("olann", "olla"),
     ("talamh", "talún"),
     ("ó", "uí"),
@@ -486,6 +484,126 @@ const TEACH_FAMILY: &[&str] = &[
 
 /// Teach family derivatives that BuNaMo puts in 1st declension.
 const TEACH_FAMILY_1ST: &[&str] = &["craobhtheach", "díonteach"];
+
+/// BuNaMo-only genitiveless nouns (no other dictionary definition).
+const BUNAMO_ONLY_GENITIVELESS: &[&str] = &[
+    "dipín", "ac", "rac", "carrac", "gúsnaic", "traic", "téic", "ruc",
+    "búitíc", "dearbhmhéid", "fíd", "blag", "stoing", "réabh", "cúlstagh",
+    "taicil", "móideim", "iomám", "treoirphlean", "muaisin", "abhatár",
+    "neasphas", "ailias", "seat", "búit", "boghspriot",
+];
+
+/// Empirical declension overrides for words the heuristics misclassify.
+/// From Python EmpiricalNounDeclensionGuesser.IRREGULAR_INCLUSION.
+const IRREGULAR_INCLUSION_EMPIRICAL: &[(&str, i8)] = &[
+    // 1st (otherwise guessed as 3rd or 4th)
+    ("bocht", 1), ("nocht", 1), ("brath", 1), ("cam", 1), ("cleas", 1),
+    ("cneas", 1), ("daol", 1), ("deargadaol", 1), ("deimheas", 1), ("dlúth", 1),
+    ("drochshaol", 1), ("forás", 1), ("gléas", 1), ("gnáth", 1), ("gnéas", 1),
+    ("gram", 1), ("láth", 1), ("lúth", 1), ("prás", 1),
+    ("stoth", 1), ("údarás", 1),
+    // 3rd (otherwise guessed as 1st)
+    ("ab", 3), ("aimhleas", 3), ("ainbhios", 3), ("altram", 3), ("anam", 3),
+    ("athdhreas", 3), ("bang", 3), ("bior", 3), ("bum", 3),
+    ("cac", 3), ("cead", 3), ("coincheap", 3), ("coinsias", 3), ("comhfhios", 3),
+    ("creat", 3), ("crinnghréas", 3), ("deann", 3), ("dreach", 3), ("driuch", 3),
+    ("dúshnámh", 3), ("feadh", 3), ("feart", 3), ("flas", 3), ("flosc", 3),
+    ("fríos", 3), ("fág", 3), ("fíon", 3), ("geaf", 3), ("gean", 3),
+    ("geábh", 3), ("gleann", 3), ("gliúc", 3), ("gus", 3), ("laom", 3),
+    ("leithcheal", 3), ("lionn", 3), ("loch", 3), ("mant", 3), ("modh", 3),
+    ("mogh", 3), ("muirdhreach", 3), ("mám", 3), ("oigheareas", 3),
+    ("ollmhaitheas", 3), ("rang", 3), ("riast", 3), ("rámh", 3), ("réad", 3),
+    ("ríomh", 3), ("scol", 3), ("seal", 3), ("siad", 3), ("sioc", 3),
+    ("slad", 3), ("smealt", 3), ("smior", 3), ("sos", 3), ("spreang", 3),
+    ("suanlios", 3), ("taom", 3), ("tart", 3), ("tathant", 3), ("tost", 3),
+    ("treall", 3), ("troch", 3), ("trunc", 3), ("tréad", 3), ("turghleann", 3),
+    ("tírdhreach", 3), ("uaillbhreas", 3), ("urlios", 3), ("víol", 3),
+    ("áineas", 3), ("éad", 3), ("éag", 3),
+    // 2nd (otherwise guessed as 4th or 3rd)
+    ("straidhn", 2), ("tiúin", 2), ("spairn", 2), ("diathair", 2), ("deoir", 2),
+    ("éitir", 2), ("cosmhuintir", 2), ("muintir", 2), ("aibítir", 2),
+    ("vacsaín", 2), ("dín", 2), ("falacail", 2), ("trucail", 2), ("fail", 2),
+    ("aragail", 2), ("máchail", 2), ("diail", 2), ("gunail", 2), ("copail", 2),
+    ("gasail", 2), ("hiodrocsail", 2), ("stail", 2), ("uail", 2), ("luail", 2),
+    ("cáil", 2), ("scáil", 2), ("léarscáil", 2), ("sracléarscáil", 2),
+    ("geargáil", 2), ("páil", 2), ("sáil", 2), ("miúil", 2), ("clibirt", 2),
+    ("beirt", 2), ("ceirt", 2), ("caismirt", 2), ("contúirt", 2),
+    ("bail", 2), ("scil", 2), ("beicireil", 2), ("stil", 2), ("cuil", 2),
+    ("carrchuil", 2), ("urchuil", 2), ("druil", 2), ("hipearbóil", 2),
+    ("líonóil", 2), ("cúpóil", 2), ("seachtain", 2), ("balcóin", 2),
+    ("sionfóin", 2), ("sclóin", 2), ("armóin", 2), ("dlútharmóin", 2),
+    ("hearóin", 2), ("íoróin", 2), ("gnáthscair", 2), ("teanchair", 2),
+    ("catagóir", 2), ("glóir", 2), ("póir", 2), ("ruíleas", 2),
+    // 3rd (otherwise guessed as 4th)
+    ("íobairt", 3), ("forbairt", 3), ("athfhorbairt", 3), ("treascairt", 3),
+    ("coscairt", 3), ("diúscairt", 3), ("labhairt", 3), ("tabhairt", 3),
+    ("cnuchairt", 3), ("faghairt", 3), ("íospairt", 3), ("buairt", 3),
+    // 3rd (otherwise guessed as 2nd)
+    ("ban-ab", 3), ("máthairab", 3), ("Cáisc", 3), ("scread", 3), ("troid", 3),
+    ("cuid", 3), ("cuaird", 3), ("feag", 3), ("eang", 3), ("luaith", 3),
+    ("cáith", 3), ("both", 3), ("scoth", 3), ("fíorscoth", 3), ("feoil", 3),
+    ("toil", 3), ("béicíl", 3), ("cáithíl", 3), ("búiríl", 3), ("seitríl", 3),
+    ("smaoisíl", 3), ("grianbhladhm", 3), ("uaim", 3), ("úim", 3),
+    ("athsheinm", 3), ("seinm", 3), ("dúchan", 3), ("feadhain", 3),
+    ("Samhain", 3), ("líomhain", 3), ("deoin", 3), ("goin", 3),
+    ("síocháin", 3), ("eadráin", 3), ("táin", 3), ("cnuaisciúin", 3),
+    ("fíniúin", 3), ("ríon", 3), ("banríon", 3), ("cearn", 3), ("starr", 3),
+    ("taispeáint", 3), ("iomáint", 3), ("tiomáint", 3),
+    // 4th (various)
+    ("mórphearsa", 4), ("gabhair", 4), ("feac", 4), ("cadhc", 4), ("faic", 4),
+    ("feic", 4), ("sonc", 4), ("bunc", 4), ("hurlamaboc", 4), ("trioc", 4),
+    ("stad", 4), ("leathstad", 4), ("grianstad", 4), ("lánstad", 4),
+    ("idirstad", 4), ("leagáid", 4), ("iarmhéid", 4), ("uasmhéid", 4),
+    ("bréid", 4), ("triuf", 4), ("dallamullóg", 4), ("tiubh", 4), ("neach", 4),
+    ("trach", 4), ("bláthchuach", 4), ("imchuach", 4), ("cách", 4),
+    ("fáidh", 4), ("príomháidh", 4), ("aodh", 4), ("anraith", 4),
+    ("líonrith", 4), ("clíth", 4), ("ceal", 4), ("meal", 4), ("Iúil", 4),
+    ("pléiseam", 4), ("seachain", 4), ("cliamhain", 4), ("banchliamhain", 4),
+    ("dóthain", 4), ("Céadaoin", 4), ("Déardaoin", 4), ("lachín", 4),
+    ("beainín", 4), ("óinsín", 4), ("bóín", 4), ("lao", 4), ("glao", 4),
+    ("trup", 4), ("seáp", 4), ("lear", 4), ("sciar", 4), ("riar", 4),
+    ("paor", 4), ("gearr", 4), ("seacht", 4), ("ocht", 4), ("ceant", 4),
+    // 5th
+    ("caora", 5), ("cara", 5), ("cathaoir", 5), ("deirfiúr", 5),
+    ("fearchú", 5), ("fóir", 5),
+    ("onchú", 5), ("árchú", 5), ("leaca", 5), ("ionga", 5), ("Lemma", 5),
+    ("céimseata", 5), ("leite", 5), ("cabhail", 5), ("traein", 5), ("cáin", 5),
+    ("mótarcháin", 5), ("cráin", 5), ("coróin", 5), ("abhainn", 5),
+    ("siocair", 5), ("carcair", 5), ("dair", 5), ("corcdhair", 5),
+    ("láthair", 5), ("lasair", 5), ("loinnir", 5), ("láir", 5), ("céir", 5),
+    ("fíor", 5), ("siúr", 5), ("deachú", 5),
+];
+
+/// Gender-specific declension overrides for words with multiple BuNaMo entries
+/// where different genders have different declensions. Checked before the
+/// ungated IRREGULAR_INCLUSION_EMPIRICAL table.
+const IRREGULAR_INCLUSION_GENDERED: &[(&str, Gender, i8)] = &[
+    ("bas", Gender::Masc, 4),       // fem→2 correct by heuristic
+    ("carr", Gender::Fem, 3),       // masc→1 correct by heuristic
+    ("cian", Gender::Fem, 2),       // masc→1 via FULLY_IRREGULAR
+    ("cuach", Gender::Masc, 3),     // fem→2 correct by heuristic
+    ("eas", Gender::Fem, 3),        // masc→3 correct by heuristic
+    ("fleasc", Gender::Masc, 3),    // fem→2 correct by heuristic
+    ("gal", Gender::Fem, 2),        // masc→1 via FULLY_IRREGULAR
+    ("mil", Gender::Masc, 4),       // fem→3 correct by heuristic
+    ("méid", Gender::Masc, 4),      // fem→2 correct by heuristic
+    ("svaeid", Gender::Masc, 4),    // fem→2 correct by heuristic
+    ("uasmhéid", Gender::Fem, 2),   // masc→4 via ungated IRREGULAR_INCLUSION
+    ("íosmhéid", Gender::Masc, 4),  // fem→2 correct by heuristic
+];
+
+/// Words where the same lemma+gender maps to multiple declensions in BuNaMo.
+/// The guesser returns None for these — the genitive form is needed to disambiguate.
+const AMBIGUOUS_DECLENSION: &[(&str, Gender)] = &[
+    ("beart", Gender::Masc),    // dec1 or dec3
+    ("bran", Gender::Masc),     // dec1 or dec4
+    ("cion", Gender::Masc),     // dec3 or dec4
+    ("cruach", Gender::Fem),    // dec2 or dec4
+    ("cuarc", Gender::Masc),    // dec1 or dec4
+    ("lucht", Gender::Masc),    // dec3 or dec4
+    ("léas", Gender::Masc),     // dec1 or dec3
+    ("sail", Gender::Fem),      // dec2 or dec5
+];
 
 /// Possible loanwords that take 4th declension (genitiveless) when consonant-ending.
 const POSSIBLE_LOANWORDS_GENITIVELESS: &[&str] = &[
@@ -566,53 +684,75 @@ fn in_list(lemma: &str, list: &[&str]) -> bool {
 }
 
 // ============================================================
-// Declension guessing — Simple (NualeargaisNounDeclensionGuesser)
+// Declension guessing — Empirical (EmpiricalNounDeclensionGuesser)
 // ============================================================
+
+fn lookup_irregular_inclusion(lemma: &str, gender: Gender) -> Option<i8> {
+    if let Some(dec) = IRREGULAR_INCLUSION_GENDERED.iter()
+        .find(|(l, g, _)| *l == lemma && *g == gender)
+        .map(|(_, _, dec)| *dec)
+    {
+        return Some(dec);
+    }
+    IRREGULAR_INCLUSION_EMPIRICAL.iter()
+        .find(|(l, _)| *l == lemma)
+        .map(|(_, dec)| *dec)
+}
 
 /// Guess noun declension from lemma + gender only (no genitive needed).
 ///
-/// Matches the Python `NualeargaisNounDeclensionGuesser`.
-/// Check order: 5th (always false) → 4th → 3rd → 2nd → 1st, default 3rd.
-pub fn guess_declension(lemma: &str, gender: Gender) -> Declension {
-    // Simple guesser has IRREGULAR_DECLENSION = {} (empty override), so skip it.
+/// Returns `None` for words where the same lemma+gender maps to multiple
+/// declensions in BuNaMo — the genitive form is needed to disambiguate.
+///
+/// Port of the Python `EmpiricalNounDeclensionGuesser`.
+/// Check order: 5th → 4th → 3rd → 2nd → 1st, default 3rd.
+pub fn guess_declension(lemma: &str, gender: Gender) -> Option<Declension> {
+    // Ambiguous words: same lemma+gender, multiple declensions in BuNaMo
+    if AMBIGUOUS_DECLENSION.iter().any(|(l, g)| *l == lemma && *g == gender) {
+        return None;
+    }
 
-    // MULTIPLE_WORDS (inherited from base)
-    // Note: the simple guesser's guess() method does check these, but without
-    // a known genitive we can't disambiguate. Skip for lemma-only guessing.
+    // IRREGULAR_INCLUSION (checked first — gendered overrides take priority
+    // over FULLY_IRREGULAR for words like cian and gal)
+    if let Some(dec) = lookup_irregular_inclusion(lemma, gender) {
+        return Some(Declension::from_i8(dec).unwrap_or(Declension::Third));
+    }
 
     // FULLY_IRREGULAR (inherited from base)
     if let Some((dec, _)) = lookup_fully_irregular(lemma) {
-        return Declension::from_i8(dec).unwrap_or(Declension::Irregular);
+        return Some(Declension::from_i8(dec).unwrap_or(Declension::Irregular));
     }
 
-    // IRREGULAR_GROUPS: empty in simple guesser. Skip.
+    // IRREGULAR_GROUPS: FAMILY → 5th
+    if in_list(lemma, FAMILY) {
+        return Some(Declension::Fifth);
+    }
 
-    // IRREGULAR_INCLUSION for simple guesser: im→2, sliabh→2
-    // These are applied inside the checks loop, not as immediate returns.
-    // We handle them inline below.
-    let irregular_inclusion: Option<i8> = match lemma {
-        "im" => Some(2),
-        "sliabh" => Some(2),
-        _ => None,
-    };
+    // TEACH_FAMILY → Irregular
+    if in_list(lemma, TEACH_FAMILY) {
+        return Some(Declension::Irregular);
+    }
+    // TEACH_FAMILY_1ST → First
+    if in_list(lemma, TEACH_FAMILY_1ST) {
+        return Some(Declension::First);
+    }
 
     // Check order: 5th → 4th → 3rd → 2nd → 1st
-    // (5th always returns false in simple guesser)
     let checks: &[(i8, fn(&str, Gender) -> bool)] = &[
-        (5, is_fifth_simple),
-        (4, is_fourth_simple),
-        (3, is_third_simple),
-        (2, is_second_simple),
-        (1, is_first_simple),
+        (5, is_fifth_empirical),
+        (4, is_fourth_empirical),
+        (3, is_third_empirical),
+        (2, is_second_empirical),
+        (1, is_first_empirical),
     ];
 
     for &(dec, check) in checks {
-        if irregular_inclusion == Some(dec) || (irregular_inclusion.is_none() && check(lemma, gender)) {
-            return Declension::from_i8(dec).unwrap_or(Declension::Third);
+        if check(lemma, gender) {
+            return Some(Declension::from_i8(dec).unwrap_or(Declension::Third));
         }
     }
 
-    Declension::Third
+    Some(Declension::Third)
 }
 
 /// Guess noun declension with compound decomposition.
@@ -622,78 +762,207 @@ pub fn guess_declension(lemma: &str, gender: Gender) -> Declension {
 /// can identify a known head word (including through lenition at the
 /// join point), we trust it over morphological rules. The rules are
 /// the fallback for non-compound words.
-pub fn guess_declension_compound(lemma: &str, gender: Gender, db: &LemmaDb) -> Declension {
+pub fn guess_declension_compound(lemma: &str, gender: Gender, db: &LemmaDb) -> Option<Declension> {
     // Exception lookups always take priority
     if let Some((dec, _)) = lookup_fully_irregular(lemma) {
-        return Declension::from_i8(dec).unwrap_or(Declension::Irregular);
+        return Some(Declension::from_i8(dec).unwrap_or(Declension::Irregular));
     }
 
     // Compound decomposition: if the word ends with a known lemma
     // (possibly lenited at the join), inherit its declension.
     // Only match when head is shorter than the full word (i.e. there's a prefix).
     if let Some(head_dec) = db.find_compound_head(lemma, gender) {
-        return Declension::from_i8(head_dec).unwrap_or(Declension::Third);
+        return Some(Declension::from_i8(head_dec).unwrap_or(Declension::Third));
     }
 
     // Fall back to morphological rules
     guess_declension(lemma, gender)
 }
 
-fn is_fifth_simple(_lemma: &str, _gender: Gender) -> bool {
-    false
+/// Check if lemma (minus last char) ends with any of the given suffixes.
+fn pre_last_ends_with(lemma: &str, suffixes: &[&str]) -> bool {
+    let chars: Vec<char> = lemma.chars().collect();
+    if chars.len() < 2 { return false; }
+    let pre_last: String = chars[..chars.len() - 1].iter().collect();
+    suffixes.iter().any(|s| pre_last.ends_with(s))
 }
 
-fn is_fourth_simple(lemma: &str, gender: Gender) -> bool {
-    // Loanwords with consonant ending → 4th
-    if in_list(lemma, POSSIBLE_LOANWORDS_GENITIVELESS) {
-        if let Some(last) = lemma.chars().last() {
-            if opers::CONSONANTS.contains(last.to_lowercase().next().unwrap_or(last)) {
-                return true;
-            }
-        }
-    }
-
-    // Fem vowel-ending → 4th (97% of fem vowel-ending nouns in BuNaMo are 4th;
-    // the few 5th-decl exceptions like caora, pearsa are already guessed wrong as 3rd)
-    if gender == Gender::Fem {
-        if let Some(last) = lemma.chars().last() {
-            if opers::VOWELS.contains(last) {
-                return true;
-            }
-        }
-    }
-
-    if gender == Gender::Masc && re_ends(lemma, &[&format!("[{}]", opers::VOWELS), "ín"]) {
-        return true;
-    }
-    false
+fn ends_with_any(lemma: &str, suffixes: &[&str]) -> bool {
+    suffixes.iter().any(|s| lemma.ends_with(s))
 }
 
-fn is_third_simple(lemma: &str, gender: Gender) -> bool {
-    if gender == Gender::Fem && re_ends(lemma, &["áil", "úil", "ail", "úint", "cht", "irt"]) {
+fn is_fifth_empirical(lemma: &str, gender: Gender) -> bool {
+    if lemma.ends_with("ceathrú") || lemma.ends_with("cheathrú") {
         return true;
     }
-    if gender == Gender::Masc && re_ends(lemma, &["éir", "eoir", "óir", "úir"]) {
-        return true;
-    }
-    false
-}
 
-fn is_second_simple(lemma: &str, gender: Gender) -> bool {
     if gender != Gender::Fem {
         return false;
     }
-    if opers::is_slender(lemma) {
+
+    let last = match lemma.chars().last() {
+        Some(c) => c,
+        None => return false,
+    };
+
+    // Approximate the SingularInfoL genitive==lemma check:
+    // broad-ending words don't change under 5th-decl depalatalization → not 5th,
+    // UNLESS they match the a(rs|ch|rch|nm)a exception pattern.
+    if !opers::is_slender(lemma) && !opers::VOWELS.contains(last) {
+        return false;
+    }
+
+    if last == 'r' || last == 'l' || last == 'n' {
+        // Positive: pre-last suffixes riai/tiúi, or full suffixes
+        if pre_last_ends_with(lemma, &["riai", "tiúi"])
+            || ends_with_any(lemma, &["thir", "tir", "mhir", "eoir", "athair", "ochair", "bhair", "eorainn"])
+        {
+            return true;
+        }
+
+        // Negative: pre-last suffixes í/úi/ói/éi/in/ái, or full suffixes
+        if pre_last_ends_with(lemma, &["í", "úi", "ói", "éi", "in", "ái"])
+            || ends_with_any(lemma, &["eoil", "coil", "tir", "bair", "ain", "ir", "ill", "il", "in"])
+        {
+            return false;
+        }
+
         return true;
     }
-    if re_ends(lemma, &["eog", "óg", "lann", "ach"]) {
+
+    // Vowel-ending fem: rare as 5th, specific cases in IRREGULAR_INCLUSION.
+    // Pattern a(rs|ch|rch|nm)a → 5th (e.g. pearsa)
+    if opers::VOWELS.contains(last) && re_ends(lemma, &["a(rs|ch|rch|nm)a"]) {
         return true;
     }
+
     false
 }
 
-fn is_first_simple(lemma: &str, gender: Gender) -> bool {
-    gender == Gender::Masc && !opers::is_slender(lemma)
+fn is_fourth_empirical(lemma: &str, gender: Gender) -> bool {
+    if in_list(lemma, POSSIBLE_LOANWORDS_GENITIVELESS) || in_list(lemma, BUNAMO_ONLY_GENITIVELESS) {
+        return true;
+    }
+
+    // Masc + ín
+    if gender == Gender::Masc && lemma.ends_with("ín") {
+        return true;
+    }
+
+    // Masc + suffix set (with exclusions)
+    if gender == Gender::Masc {
+        let has_suffix = ends_with_any(lemma, &["ín", "aí", "ú", "nm", "iam", "cs", "ts", "ns", "eo"])
+            || re_ends(lemma, &["[^óoé]ir"]);
+        let excluded = Regex::new("[eú]ir").unwrap().is_match(lemma);
+        if has_suffix && !excluded && !in_list(lemma, FAMILY) {
+            return true;
+        }
+    }
+
+    // Any gender + specific endings
+    if ends_with_any(lemma, &["a", "e", "í", "le", "ne", "é", "aoi", "ó", "á"]) {
+        return true;
+    }
+
+    false
+}
+
+fn is_third_empirical(lemma: &str, gender: Gender) -> bool {
+    if in_list(lemma, UNSYNCOPATED_3RD) {
+        return true;
+    }
+
+    // Negative exception endings
+    if re_ends(lemma, &[
+        "[^g][aá]irt", "oirt", "[ds]h?úil", "bh?ail", "fh?iacail",
+        "[bc]h?[aú]irt", "ol", "[^e]oil", "[aá]ch?an", "an", "aol",
+        "[^úc]int", "ean", "us",
+    ]) {
+        return false;
+    }
+
+    // Positive endings (any gender)
+    if re_ends(lemma, &[
+        "áil", "úil", "ail", "úint", "cht", "irt",
+        "áint", "aint", "int", "chtain", "an",
+    ]) {
+        return true;
+    }
+
+    // Masc-gated positive endings
+    if gender == Gender::Masc && re_ends(lemma, &[
+        "int", "éir", "ain", "us", "eir", "eoir", "óir", "úir", "cht",
+    ]) {
+        return true;
+    }
+
+    false
+}
+
+fn is_second_empirical(lemma: &str, gender: Gender) -> bool {
+    if gender == Gender::Masc && lemma != "im" {
+        return false;
+    }
+
+    let mono = !opers::polysyllabic(lemma);
+
+    if mono {
+        if !opers::is_slender(lemma) {
+            return true;
+        }
+        if re_ends(lemma, &["[^eoéú]il", "ói[nr]"]) {
+            return false;
+        }
+    } else {
+        // Poly positive
+        if re_ends(lemma, &[
+            "ail", "ain", "úil", "is?[msrtgbcdnh]+il",
+            "[pb]h?[eé]il", "scoil",
+        ]) {
+            return true;
+        }
+        // Poly negative
+        let mono_broad_in = format!("^[{}]*[aoáóuú]+[ií]n", opers::CONSONANTS);
+        if re_ends(lemma, &[
+            "il", "aíl", "ói[nr]", "c?ht?ain", "[oáa]chan",
+            "bh?liain", "ch?uid", "ch?air", "e[aá]s", "[bc]h?ail",
+            "laim", &mono_broad_in,
+        ]) {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn is_first_empirical(lemma: &str, gender: Gender) -> bool {
+    // Negative exclusions (any gender)
+    if re_ends(lemma, &[
+        "th", "lus", "luach", "mheas", "rás", "bhr?éas",
+        "d.*[ou]l", "ch?r?[ií]os", "rud", "íoc",
+    ]) {
+        return false;
+    }
+
+    // Monosyllabic negative exclusions
+    if !opers::polysyllabic(lemma) {
+        if re_ends(lemma, &["ios", "am", "iol", "[eé]as"]) {
+            return false;
+        }
+        if lemma.starts_with("sn") {
+            return false;
+        }
+    }
+
+    // Broad + masc → true
+    if gender == Gender::Masc {
+        let pat = format!("([{}]|ae)[{}]*$", opers::VOWELS_BROAD, opers::CONSONANTS);
+        if Regex::new(&pat).unwrap().is_match(lemma) {
+            return true;
+        }
+    }
+
+    false
 }
 
 // ============================================================
@@ -877,7 +1146,81 @@ fn singular_paradigm_1st(lemma: &str, gender: Gender) -> SingularInfo {
     singular_info::singular_info_c(lemma, gender, target, with_iai)
 }
 
+const SYNCOPATING_NOUN_DEC2: &[(&str, &str)] = &[
+    ("aibítir", "aibítre"),
+    ("bheach", "bheiche"),
+    ("boireann", "boirne"),
+    ("bruithean", "bruithne"),
+    ("cadhain", "caidhne"),
+    ("caibidil", "caibidle"),
+    ("caileann", "caille"),
+    ("caingean", "caingne"),
+    ("choinneal", "choinnle"),
+    ("chuach", "chuaiche"),
+    ("coinneal", "coinnle"),
+    ("cuach", "cuaiche"),
+    ("dabhach", "daibhche"),
+    ("daighear", "daighre"),
+    ("deifir", "deifre"),
+    ("domhain", "doimhne"),
+    ("dumhach", "duimhche"),
+    ("faighin", "faighne"),
+    ("feithicil", "feithicle"),
+    ("fheithicil", "fheithicle"),
+    ("fhoireann", "fhoirne"),
+    ("foireann", "foirne"),
+    ("fothair", "foithre"),
+    ("geimheal", "geimhle"),
+    ("ladhar", "laidhre"),
+    ("loighic", "loighce"),
+    ("meadar", "meidre"),
+    ("meidhir", "meidhre"),
+    ("meitheal", "meithle"),
+    ("obair", "oibre"),
+    ("paidir", "paidre"),
+    ("ruíleas", "ruílse"),
+    ("saighead", "saighde"),
+    ("saighean", "saighne"),
+    ("sceimheal", "sceimhle"),
+    ("seamair", "seimre"),
+    ("seicin", "seicne"),
+    ("sluasaid", "sluaiste"),
+    ("stroighin", "stroighne"),
+    ("toighis", "toighse"),
+    ("traimil", "traimle"),
+    ("treighid", "treighde"),
+    ("trilis", "trilse"),
+    ("veidhil", "veidhle"),
+];
+
+const SYNCOPATING_NOUN_DEC2_EXACT: &[(&str, &str)] = &[
+    ("inis", "inse"),
+    ("leithinis", "leithinse"),
+];
+
+fn lookup_syncopating_dec2(lemma: &str) -> Option<String> {
+    if let Some((_, form)) = SYNCOPATING_NOUN_DEC2_EXACT.iter().find(|(l, _)| *l == lemma) {
+        return Some(form.to_string());
+    }
+    if let Some((_, form)) = SYNCOPATING_NOUN_DEC2.iter().find(|(l, _)| *l == lemma) {
+        return Some(form.to_string());
+    }
+    for &(root, form) in SYNCOPATING_NOUN_DEC2 {
+        if lemma.len() > root.len() && lemma.ends_with(root) {
+            let prefix = &lemma[..lemma.len() - root.len()];
+            return Some(format!("{}{}", prefix, form));
+        }
+    }
+    None
+}
+
 fn singular_paradigm_2nd(lemma: &str, gender: Gender) -> SingularInfo {
+    if let Some(gen) = lookup_syncopating_dec2(lemma) {
+        let mut info = singular_info::singular_info_o(lemma, gender);
+        info.genitive = vec![Form::new(&gen)];
+        return info;
+    }
+
     let ei_target = if in_list(lemma, POLYSYLLABIC_EI_2ND) {
         "ei"
     } else {
@@ -902,7 +1245,95 @@ fn singular_paradigm_3rd(lemma: &str, gender: Gender) -> SingularInfo {
     singular_info::singular_info_a(lemma, gender, false, "", with_syncopated_ai)
 }
 
+// Dec-4 words ending in -ú whose genitive = lemma (NOT verbal nouns).
+// Two tiers: COMPOUND roots use ends_with matching (for compounds like
+// cúlbhrú, torc-chú); EXACT roots match only the lemma itself (to avoid
+// false positives from short suffixes like -dú, -rú).
+const DEC4_NO_CHANGE_COMPOUND: &[&str] = &[
+    "brú", "bhrú",
+    "criú", "chriú",
+    "crú", "chrú",
+    "cú", "chú",
+    "scriú",
+];
+
+const DEC4_NO_CHANGE_EXACT: &[&str] = &[
+    "Súlú",
+    "aililiú",
+    "bambú",
+    "beárbaiciú",
+    "bú",
+    "caitsiú",
+    "cangarú",
+    "canú",
+    "casú",
+    "cillsú",
+    "ciú",
+    "cinceasú",
+    "clú",
+    "cocatú",
+    "cuandú",
+    "cuirfiú",
+    "dea-chlú",
+    "didiridiú",
+    "diomú",
+    "dorú",
+    "droch-chlú",
+    "dú",
+    "fiachú",
+    "fiú",
+    "fliú",
+    "furú",
+    "gearbú",
+    "gliú",
+    "gnú",
+    "gúrú",
+    "húdú",
+    "húpú",
+    "ionú",
+    "liú",
+    "míchlú",
+    "ragú",
+    "rú",
+    "sapaisiú",
+    "seampú",
+    "sliú",
+    "smiú",
+    "sú",
+    "séabú",
+    "síotsú",
+    "tlú",
+    "vuinsciú",
+    "zú",
+    "íoglú",
+    "éamú",
+    // Ordinals
+    "tríú",
+    "ceathrachadú",
+    "caogadú",
+];
+
+fn is_dec4_no_change(lemma: &str) -> bool {
+    if DEC4_NO_CHANGE_EXACT.iter().any(|&w| w == lemma) {
+        return true;
+    }
+    DEC4_NO_CHANGE_COMPOUND.iter().any(|&root| {
+        lemma == root || (lemma.len() > root.len() && lemma.ends_with(root))
+    })
+}
+
 fn singular_paradigm_4th(lemma: &str, gender: Gender) -> SingularInfo {
+    if lemma.ends_with("ú") && !is_dec4_no_change(lemma) {
+        let stem = &lemma[..lemma.len() - "ú".len()];
+        let gen = if stem.ends_with('i') {
+            format!("{}the", stem)
+        } else {
+            format!("{}aithe", stem)
+        };
+        let mut info = singular_info::singular_info_o(lemma, gender);
+        info.genitive = vec![Form::new(&gen)];
+        return info;
+    }
     singular_info::singular_info_o(lemma, gender)
 }
 
@@ -1102,25 +1533,25 @@ mod tests {
 
     #[test]
     fn test_guess_first_decl() {
-        assert_eq!(guess_declension("bád", Gender::Masc), Declension::First);
-        assert_eq!(guess_declension("fear", Gender::Masc), Declension::First);
+        assert_eq!(guess_declension("bád", Gender::Masc), Some(Declension::First));
+        assert_eq!(guess_declension("fear", Gender::Masc), Some(Declension::First));
     }
 
     #[test]
     fn test_guess_second_decl() {
-        assert_eq!(guess_declension("bróg", Gender::Fem), Declension::Second);
-        assert_eq!(guess_declension("fuinneog", Gender::Fem), Declension::Second);
+        assert_eq!(guess_declension("bróg", Gender::Fem), Some(Declension::Second));
+        assert_eq!(guess_declension("fuinneog", Gender::Fem), Some(Declension::Second));
     }
 
     #[test]
     fn test_guess_third_decl() {
-        assert_eq!(guess_declension("beannacht", Gender::Fem), Declension::Third);
-        assert_eq!(guess_declension("dochtúir", Gender::Masc), Declension::Third);
+        assert_eq!(guess_declension("beannacht", Gender::Fem), Some(Declension::Third));
+        assert_eq!(guess_declension("dochtúir", Gender::Masc), Some(Declension::Third));
     }
 
     #[test]
     fn test_guess_fourth_decl() {
-        assert_eq!(guess_declension("bainne", Gender::Masc), Declension::Fourth);
+        assert_eq!(guess_declension("bainne", Gender::Masc), Some(Declension::Fourth));
     }
 
     #[test]
@@ -1138,8 +1569,8 @@ mod tests {
 
     #[test]
     fn test_fully_irregular_lookup() {
-        assert_eq!(guess_declension("laoch", Gender::Masc), Declension::First);
-        assert_eq!(guess_declension("scian", Gender::Fem), Declension::Second);
+        assert_eq!(guess_declension("laoch", Gender::Masc), Some(Declension::First));
+        assert_eq!(guess_declension("scian", Gender::Fem), Some(Declension::Second));
     }
 
     #[test]

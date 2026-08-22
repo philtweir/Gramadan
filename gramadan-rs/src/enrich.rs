@@ -193,10 +193,15 @@ fn enrich_noun(record: &Record, db: &LemmaDb) -> EnrichResult {
     }
 
     // 4. Morphological guesser (last resort)
-    let dec = noun::guess_declension(lemma, gender);
-    EnrichResult {
-        grammar_class: dec.as_i8().to_string(),
-        method: Method::MorphologicalGuesser,
+    match noun::guess_declension(lemma, gender) {
+        Some(dec) => EnrichResult {
+            grammar_class: dec.as_i8().to_string(),
+            method: Method::MorphologicalGuesser,
+        },
+        None => EnrichResult {
+            grammar_class: String::new(),
+            method: Method::MorphologicalGuesser,
+        },
     }
 }
 
@@ -211,9 +216,9 @@ fn enrich_verb(record: &Record) -> EnrichResult {
 
     let conj = verb::guess_conjugation(lemma);
     let class_str = match conj {
-        verb::ConjugationClass::First => "1",
-        verb::ConjugationClass::Second => "2",
-        verb::ConjugationClass::Irregular => "irr",
+        verb::VerbConjugationClass::First => "1",
+        verb::VerbConjugationClass::Second => "2",
+        verb::VerbConjugationClass::Irregular => "irr",
     };
 
     EnrichResult {
