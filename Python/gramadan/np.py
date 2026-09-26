@@ -2,11 +2,12 @@
 
 from lxml import etree as ET
 from typing import Optional, Union
-from .features import Gender, Mutation, FormSg, Form, FormPlGen, Strength
+from .features import Gender, Mutation, FormSg, Form, FormPlGen, Strength, FormList
 from .noun import Noun
 from .opers import Opers
 from .possessive import Possessive
 from .adjective import Adjective
+from .explainer import ExplainStr
 
 NounType = Noun
 
@@ -60,51 +61,51 @@ class NP:
         disambig: str = "",
     ):
         # Noun phrase forms in the singular, without article:
-        self.sgNom: list[FormSg] = []
+        self.sgNom: list[FormSg] = FormList()
         if sgNom is not None:
             self.sgNom = sgNom
-        self.sgGen: list[FormSg] = []
+        self.sgGen: list[FormSg] = FormList()
         if sgGen is not None:
             self.sgGen = sgGen
-        self.sgDat: list[FormSg] = []  # head noun left unmutated
+        self.sgDat: list[FormSg] = FormList()
         if sgDat is not None:
             self.sgDat = sgDat
 
         # Noun phrase forms in the singular, with article:
-        self.sgNomArt: list[FormSg] = []
+        self.sgNomArt: list[FormSg] = FormList()
         if sgNomArt is not None:
             self.sgNomArt = sgNomArt
-        self.sgGenArt: list[FormSg] = []
+        self.sgGenArt: list[FormSg] = FormList()
         if sgGenArt is not None:
             self.sgGenArt = sgGenArt
         # northern system, as if with article but the article is *not* included, head noun unmutated
-        self.sgDatArtN: list[FormSg] = []
+        self.sgDatArtN: list[FormSg] = FormList()
         if sgDatArtN is not None:
             self.sgDatArtN = sgDatArtN
         # southern system, as if with article but the article is *not* included, head noun unmutated
-        self.sgDatArtS: list[FormSg] = []
+        self.sgDatArtS: list[FormSg] = FormList()
         if sgDatArtS is not None:
             self.sgDatArtS = sgDatArtS
 
         # Noun phrase forms in the plural, without article:
-        self.plNom: list[Form] = []
+        self.plNom: list[Form] = FormList()
         if plNom is not None:
             self.plNom = plNom
-        self.plGen: list[FormPlGen] = []
+        self.plGen: list[FormPlGen] = FormList()
         if plGen is not None:
             self.plGen = plGen
-        self.plDat: list[Form] = []  # head noun left unmutated
+        self.plDat: list[Form] = FormList()
         if plDat is not None:
             self.plDat = plDat
 
         # Noun phrase forms in the plural, with article:
-        self.plNomArt: list[Form] = []
+        self.plNomArt: list[Form] = FormList()
         if plNomArt is not None:
             self.plNomArt = plNomArt
-        self.plGenArt: list[Form] = []
+        self.plGenArt: list[Form] = FormList()
         if plGenArt is not None:
             self.plGenArt = plGenArt
-        self.plDatArt: list[Form] = []
+        self.plDatArt: list[Form] = FormList()
         if (
             plDatArt is not None
         ):  # as if with article but the article is *not* included, head noun unmutated
@@ -225,71 +226,83 @@ class NP:
     ):
         # region singular-nominative
         # without article:
-        sgNom: list[FormSg] = [FormSg(sgNomStr, gender)]
+        sgNom: list[FormSg] = FormList()
+        sgNom.append(FormSg(sgNomStr, gender))
         # { # with article:
         value: str
         mut: Mutation
 
         mut = Mutation.PrefT if gender == Gender.Masc else Mutation.Len3
-        value = "an " + Opers.Mutate(
+        value = ExplainStr("an ", "article for noun nominative") + Opers.Mutate(
             mut,
             sgNomStr,
             "NP|sgNom>sgNomArt: lenite feminine (or t- masculine vowels)"
         )
-        sgNomArt: list[FormSg] = [FormSg(value, gender)]
+        sgNomArt: list[FormSg] = FormList()
+        sgNomArt.append(FormSg(value, gender))
         # }
         # endregion
         # region singular-genitive
         # { # without article:
-        sgGen: list[FormSg] = [FormSg(sgNomStr, gender)]
+        sgGen: list[FormSg] = FormList()
+        sgGen.append(FormSg(sgNomStr, gender))
         # }
         # { # with article:
         mut = Mutation.Len3 if gender == Gender.Masc else Mutation.PrefH
         article: str = "an" if gender == Gender.Masc else "na"
+        article = ExplainStr(article, "article for " + ("masculine" if gender == Gender.Masc else "feminine") + " noun genitive")
         value = article + " " + Opers.Mutate(
             mut,
             sgGenStr,
             "NP|sgGenArt: where possible, prefixes h- to singular nominative if feminine beginning with vowel, otherwise lenites"
         )
-        sgGenArt: list[FormSg] = [FormSg(value, gender)]
+        sgGenArt: list[FormSg] = FormList()
+        sgGenArt.append(FormSg(value, gender))
         # }
         # endregion
         # region plural-nominative
         # { # without article:
-        plNom: list[Form] = [Form(plNomStr)]
+        plNom: list[Form] = FormList()
+        plNom.append(Form(plNomStr))
         # }
         # { # with article:
-        value = "na " + Opers.Mutate(
+        value = ExplainStr("na ", "plural article") + Opers.Mutate(
             Mutation.PrefH,
             plNomStr,
             "NP|plNomArt: add h- to feminine vowels"
         )
-        plNomArt: list[Form] = [Form(value)]
+        plNomArt: list[Form] = FormList()
+        plNomArt.append(Form(value))
         # }
         # endregion
         # region plural-genitive
         # { # without article:
-        plGen: list[Form] = [Form(plNomStr)]
+        plGen: list[Form] = FormList()
+        plGen.append(Form(plNomStr))
         # }
         # { # with article:
-        value = "na " + Opers.Mutate(
+        value = ExplainStr("na ", "article for plural noun") + Opers.Mutate(
             Mutation.Ecl1,
             plGenStr,
             "NP|plGenArt: where possible, eclipses"
         )
-        plGenArt: list[Form] = [Form(value)]
+        plGenArt: list[Form] = FormList()
+        plGenArt.append(Form(value))
         # }
         # endregion
         # region singular-dative
         # { # without article:
-        sgDat: list[FormSg] = [FormSg(sgNomStr, gender)]
+        sgDat: list[FormSg] = FormList()
+        sgDat.append(FormSg(sgNomStr, gender))
         # }
         # { # with article:
-        sgDatArtN: list[FormSg] = [FormSg(sgDatArtNStr, gender)]
-        sgDatArtS: list[FormSg] = [FormSg(sgNomStr, gender)]  # PTW: yes, nominative
+        sgDatArtN: list[FormSg] = FormList()
+        sgDatArtN.append(FormSg(sgDatArtNStr, gender))
+        sgDatArtS: list[FormSg] = FormList()
+        sgDatArtS.append(FormSg(sgNomStr, gender))  # PTW: yes, nominative
 
         mut = Mutation.PrefT if gender == Gender.Masc else Mutation.Len3
-        value = "an " + Opers.Mutate(
+        value = ExplainStr("an ", "article for noun nominative") + Opers.Mutate(
             mut,
             sgNomStr,
             "NP|sgNom>sgNomArt: lenite feminine (or t- masculine vowels)"
@@ -300,10 +313,12 @@ class NP:
         # endregion
         # region plural-dative
         # { # without article:
-        plDat = [Form(plNomStr)]
+        plDat = FormList()
+        plDat.append(Form(plNomStr))
         # }
         # { # with article:
-        plDatArt = [Form(plNomStr)]
+        plDatArt = FormList()
+        plDatArt.append(Form(plNomStr))
         # }
         # endregion
         return cls(
@@ -352,19 +367,19 @@ class NP:
         headFormSg: FormSg  # naturally, these could be together, but
         headForm: Form  # this is very helpful for checking
         headFormPlGen: FormPlGen
-        sgNom: list[FormSg] = []
-        sgGen: list[FormSg] = []
-        sgDat: list[FormSg] = []
-        sgNomArt: list[FormSg] = []
-        sgGenArt: list[FormSg] = []
-        sgDatArtN: list[FormSg] = []
-        sgDatArtS: list[FormSg] = []
-        plNom: list[Form] = []
-        plGen: list[FormPlGen] = []
-        plDat: list[Form] = []
-        plNomArt: list[Form] = []
-        plGenArt: list[Form] = []
-        plDatArt: list[Form] = []
+        sgNom: list[FormSg] = FormList()
+        sgGen: list[FormSg] = FormList()
+        sgDat: list[FormSg] = FormList()
+        sgNomArt: list[FormSg] = FormList()
+        sgGenArt: list[FormSg] = FormList()
+        sgDatArtN: list[FormSg] = FormList()
+        sgDatArtS: list[FormSg] = FormList()
+        plNom: list[Form] = FormList()
+        plGen: list[FormPlGen] = FormList()
+        plDat: list[Form] = FormList()
+        plNomArt: list[Form] = FormList()
+        plGenArt: list[Form] = FormList()
+        plDatArt: list[Form] = FormList()
 
         article: str
         value: str
@@ -382,7 +397,7 @@ class NP:
                 )
                 if head.isImmutable:
                     mut = Mutation.Nil
-                value = "an " + Opers.Mutate(
+                value = ExplainStr("an ", "article for noun nominative") + Opers.Mutate(
                     mut,
                     headFormSg.value,
                     "NP|noun.sgNom>noun.sgNomArt: would lenite feminine but noun is immutable"
@@ -420,6 +435,7 @@ class NP:
                 if head.isImmutable:
                     mut = Mutation.Nil
                 article = "an" if headFormSg.gender == Gender.Masc else "na"
+                article = ExplainStr(article, "article for " + ("masculine" if headFormSg.gender == Gender.Masc else "feminine") + " genitive noun")
                 value = article + " " + Opers.Mutate(
                     mut,
                     headFormSg.value,
@@ -441,7 +457,7 @@ class NP:
                 mut = Mutation.PrefH
                 if head.isImmutable:
                     mut = Mutation.Nil
-                value = "na " + Opers.Mutate(
+                value = ExplainStr("na ", "article for plural noun") + Opers.Mutate(
                     mut,
                     headForm.value,
                     (
@@ -475,7 +491,7 @@ class NP:
                 mut = Mutation.Ecl1
                 if head.isImmutable:
                     mut = Mutation.Nil
-                value = "na " + Opers.Mutate(
+                value = ExplainStr("na ", "article for plural noun") + Opers.Mutate(
                     mut,
                     headFormPlGen.value,
                     (
@@ -577,19 +593,19 @@ class NP:
             isDefinite = head.isDefinite
             isImmutable = head.isImmutable
             forceNominative = True
-            sgNom = []
-            sgNomArt = []
-            sgGen = []
-            sgGenArt = []
-            sgDat = []
-            sgDatArtN = []
-            sgDatArtS = []
-            plNom = []
-            plNomArt = []
-            plGen = []
-            plGenArt = []
-            plDat = []
-            plDatArt = []
+            sgNom = FormList()
+            sgNomArt = FormList()
+            sgGen = FormList()
+            sgGenArt = FormList()
+            sgDat = FormList()
+            sgDatArtN = FormList()
+            sgDatArtS = FormList()
+            plNom = FormList()
+            plNomArt = FormList()
+            plGen = FormList()
+            plGenArt = FormList()
+            plDat = FormList()
+            plDatArt = FormList()
             # region singular-nominative
             headFormSg: FormSg
             modForm: Form
@@ -629,7 +645,7 @@ class NP:
                             else Mutation.Len1
                         )
                         value = (
-                            "an "
+                            ExplainStr("an ", "article for noun nominative")
                             + Opers.Mutate(
                                 mutN,
                                 headFormSg.value,
@@ -710,6 +726,7 @@ class NP:
                             else Mutation.Nil
                         )
                         article = "an" if headFormSg.gender == Gender.Masc else "na"
+                        article = ExplainStr(article, "article for " + ("masculine" if headFormSg.gender == Gender.Masc else "feminine") + " genitive noun")
                         value = (
                             article
                             + " "
@@ -764,7 +781,7 @@ class NP:
                             else Mutation.Nil
                         )
                         value = (
-                            "na "
+                            ExplainStr("na ", "article for plural noun")
                             + Opers.Mutate(
                                 mutN,
                                 headForm.value,
@@ -840,13 +857,18 @@ class NP:
                             )
                             # "Gael", "captaen" are not slender
                         value = (
-                            "na "
+                            ExplainStr("na ", "article for plural noun")
                             + Opers.Mutate(
                                 mutN,
-                                headFormPlGen.value
+                                headFormPlGen.value,
+                                (
+                                    "no eclipsing the plural genitive if noun immutable" if head.isImmutable else "eclipse the plural genitive"
+                                )
                             )
                             + " "
-                            + Opers.Mutate(
+                        )
+                        mut = (
+                            Opers.Mutate(
                                 mutA,
                                 modForm.value,
                                 (
@@ -856,7 +878,9 @@ class NP:
                                 )
                             )
                         )
-                        plGenArt.append(Form(value))
+                        value += mut
+                        form = Form(value)
+                        plGenArt.append(form)
 
             # endregion
             # region singular-dative
@@ -1073,13 +1097,13 @@ class NP:
 
         # endregion
         # region empty-all-others
-        self.sgDatArtN = []
-        self.sgDatArtS = []
-        self.sgGenArt = []
-        self.sgNomArt = []
-        self.plDatArt = []
-        self.plGenArt = []
-        self.plNomArt = []
+        self.sgDatArtN = FormList()
+        self.sgDatArtS = FormList()
+        self.sgGenArt = FormList()
+        self.sgNomArt = FormList()
+        self.plDatArt = FormList()
+        self.plGenArt = FormList()
+        self.plNomArt = FormList()
         # endregion
 
     # Prints the noun phrase in BuNaMo format:
@@ -1168,19 +1192,19 @@ class NP:
         isPossessed: bool = root.get("isPossessed") == "1"
         isImmutable: bool = root.get("isImmutable") == "1"
         forceNominative: bool = root.get("forceNominative") == "1"
-        sgNom: list[FormSg] = []
-        sgNomArt: list[FormSg] = []
-        sgGen: list[FormSg] = []
-        sgGenArt: list[FormSg] = []
-        sgDat: list[FormSg] = []
-        sgDatArtN: list[FormSg] = []
-        sgDatArtS: list[FormSg] = []
-        plNom: list[Form] = []
-        plNomArt: list[Form] = []
-        plGen: list[FormPlGen] = []
-        plGenArt: list[Form] = []
-        plDat: list[Form] = []
-        plDatArt: list[Form] = []
+        sgNom: list[FormSg] = FormList()
+        sgNomArt: list[FormSg] = FormList()
+        sgGen: list[FormSg] = FormList()
+        sgGenArt: list[FormSg] = FormList()
+        sgDat: list[FormSg] = FormList()
+        sgDatArtN: list[FormSg] = FormList()
+        sgDatArtS: list[FormSg] = FormList()
+        plNom: list[Form] = FormList()
+        plNomArt: list[Form] = FormList()
+        plGen: list[FormPlGen] = FormList()
+        plGenArt: list[Form] = FormList()
+        plDat: list[Form] = FormList()
+        plDatArt: list[Form] = FormList()
         el: ET._Element
 
         for el in root.findall("./sgNom"):

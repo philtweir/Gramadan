@@ -1,7 +1,8 @@
 import logging
-from gramadan import features, opers
-from .features import Form, FormSg, FormPlGen
+from gramadan import features, opers, explainer
+from .features import Form, FormSg, FormPlGen, FormList
 from .opers import Opers
+from .explainer import ExplainStr
 from .. import np
 
 logging.warning(
@@ -15,5 +16,8 @@ logging.warning(
 features.Form = Form
 features.FormSg = FormSg
 features.FormPlGen = FormPlGen
+features.FormList = FormList
 opers.Opers = Opers
 np.Opers = Opers
+explainer.ExplainStr = ExplainStr
+np.ExplainStr = ExplainStr

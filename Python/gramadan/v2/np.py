@@ -4,13 +4,16 @@ from lxml import etree as ET
 from typing import Optional, Union
 from gramadan import np
 from gramadan.possessive import Possessive
-from .features import Form, Gender
+from .features import Form, Gender, FormSg, FormPlGen, FormList
 from .noun import Noun
 from .adjective import Adjective
 from .entity import Entity
 
 np.NounType = Noun # type: ignore
 np.Form = Form
+np.FormSg = FormSg
+np.FormPlGen = FormPlGen
+np.FormList = FormList
 
 # A class for a noun phrase:
 class NP(Entity[np.NP]):

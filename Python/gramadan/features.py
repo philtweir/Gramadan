@@ -1,5 +1,9 @@
 ﻿from dataclasses import dataclass
 from enum import Enum, auto
+from collections import UserList
+
+class FormList(UserList):
+    name: str | None = None
 
 # Enumerations for various grammatical features:
 

@@ -4,7 +4,7 @@ from lxml import etree as ET
 import re
 from typing import List, Optional, Union
 from .singular_info import SingularInfo
-from .features import Form, Mutation
+from .features import Form, Mutation, FormList
 from .opers import Opers
 from .utils import to_bool
 
@@ -33,37 +33,37 @@ class Adjective:
         except:
             isPre = False
 
-        sgNom: list[Form] = []
+        sgNom: list[Form] = FormList()
         el: ET._Element
 
         for el in root.findall("./sgNom"):
             sgNom.append(Form(el.get("default", "")))
 
-        sgGenMasc: list[Form] = []
+        sgGenMasc: list[Form] = FormList()
         for el in root.findall("./sgGenMasc"):
             sgGenMasc.append(Form(el.get("default", "")))
 
-        sgGenFem: list[Form] = []
+        sgGenFem: list[Form] = FormList()
         for el in root.findall("./sgGenFem"):
             sgGenFem.append(Form(el.get("default", "")))
 
-        sgVocMasc: list[Form] = []
+        sgVocMasc: list[Form] = FormList()
         for el in root.findall("./sgVocMasc"):
             sgVocMasc.append(Form(el.get("default", "")))
 
-        sgVocFem: list[Form] = []
+        sgVocFem: list[Form] = FormList()
         for el in root.findall("./sgVocFem"):
             sgVocFem.append(Form(el.get("default", "")))
 
-        plNom: list[Form] = []
+        plNom: list[Form] = FormList()
         for el in root.findall("./plNom"):
             plNom.append(Form(el.get("default", "")))
 
-        graded: list[Form] = []
+        graded: list[Form] = FormList()
         for el in root.findall("./graded"):
             graded.append(Form(el.get("default", "")))
 
-        abstractNoun: list[Form] = []
+        abstractNoun: list[Form] = FormList()
         for el in root.findall("./abstractNoun"):
             abstractNoun.append(Form(el.get("default", "")))
 
@@ -104,8 +104,8 @@ class Adjective:
             sgGenFem=sgFem.genitive,
             sgVocMasc=sgMasc.vocative,
             sgVocFem=sgFem.vocative,
-            plNom=None if plural is None else [Form(plural)],
-            graded=[Form(graded_)],
+            plNom=None if plural is None else FormList([Form(plural)]),
+            graded=FormList([Form(graded_)]),
         )
 
     def __init__(
@@ -125,24 +125,24 @@ class Adjective:
         # The adjective's traditional declension class (not actually used for anything); default is 0 meaning none or unknown:
 
         # Forms of the adjective:
-        self.sgNom: list[Form] = [] if sgNom is None else sgNom
-        self.sgGenMasc: list[Form] = [] if sgGenMasc is None else sgGenMasc
-        self.sgGenFem: list[Form] = [] if sgGenFem is None else sgGenFem
-        self.sgVocMasc: list[Form] = [] if sgVocMasc is None else sgVocMasc
-        self.sgVocFem: list[Form] = [] if sgVocFem is None else sgVocFem
+        self.sgNom: list[Form] = FormList() if sgNom is None else sgNom
+        self.sgGenMasc: list[Form] = FormList() if sgGenMasc is None else sgGenMasc
+        self.sgGenFem: list[Form] = FormList() if sgGenFem is None else sgGenFem
+        self.sgVocMasc: list[Form] = FormList() if sgVocMasc is None else sgVocMasc
+        self.sgVocFem: list[Form] = FormList() if sgVocFem is None else sgVocFem
 
         self.disambig = disambig
         self.declension = declension
         self.isPre = isPre
 
         # Adjective forms in the plural:
-        self.plNom: list[Form] = [] if plNom is None else plNom
+        self.plNom: list[Form] = FormList() if plNom is None else plNom
 
         # Form for grading:
-        self.graded: list[Form] = [] if graded is None else graded
+        self.graded: list[Form] = FormList() if graded is None else graded
 
         # Related abstract noun:
-        self.abstractNoun: list[Form] = [] if abstractNoun is None else abstractNoun
+        self.abstractNoun: list[Form] = FormList() if abstractNoun is None else abstractNoun
 
         # Whether the adjective is a prefix (like "sean"):
 
@@ -157,14 +157,14 @@ class Adjective:
 
     # These return graded forms of the adjective:
     def getComparPres(self) -> list[Form]:  # comparative present, eg. "níos mó"
-        ret: list[Form] = []
+        ret: list[Form] = FormList()
         gradedForm: Form
         for gradedForm in self.graded:
             ret.append(Form("níos " + gradedForm.value))
         return ret
 
     def getSuperPres(self) -> list[Form]:  # superlative present, eg. "is mó"
-        ret: list[Form] = []
+        ret: list[Form] = FormList()
         gradedForm: Form
         for gradedForm in self.graded:
             ret.append(Form("is " + gradedForm.value))
@@ -173,7 +173,7 @@ class Adjective:
     def getComparPast(
         self,
     ) -> list[Form]:  # comparative past/conditional, eg. "ní ba mhó"
-        ret: list[Form] = []
+        ret: list[Form] = FormList()
         gradedForm: Form
         for gradedForm in self.graded:
             form: str = ""
@@ -187,7 +187,7 @@ class Adjective:
         return ret
 
     def getSuperPast(self) -> list[Form]:  # superlative past/conditional, eg. "ba mhó"
-        ret: list[Form] = []
+        ret: list[Form] = FormList()
         gradedForm: Form
         for gradedForm in self.graded:
             form: str = ""

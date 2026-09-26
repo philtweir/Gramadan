@@ -3,7 +3,7 @@ from lxml import etree as ET
 from typing import Optional, Union
 
 from gramadan import noun
-from .features import FormSg, Form, FormPlGen, Gender, Strength
+from .features import FormSg, Form, FormPlGen, Gender, Strength, FormList
 from .singular_info import SingularInfo
 from .plural_info import PluralInfo
 from .entity import Entity
@@ -13,6 +13,9 @@ from ..possessive import Possessive
 noun.SingularInfo = SingularInfo
 noun.PluralInfo = PluralInfo
 noun.Form = Form
+noun.FormSg = FormSg
+noun.FormPlGen = FormPlGen
+noun.FormList = FormList
 
 # A noun
 class Noun(Entity[noun.Noun]):

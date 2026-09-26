@@ -3,12 +3,12 @@ from __future__ import annotations
 from typing import Optional, Union, Sequence
 from lxml import etree as ET
 from gramadan.verb import VerbMood, VerbTense, VPPolarity
-from .features import Form
+from .features import FormVS, FormList
 from .verb import VPShape
 from .entity import Entity
 
-TenseDictionary = dict[VerbTense, dict[VPShape, dict[VPPolarity, list[tuple[Form, Form | None]]]]]
-MoodDictionary = dict[VerbMood, dict[VPPolarity, list[tuple[Form, Form | None]]]]
+TenseDictionary = dict[VerbTense, dict[VPShape, dict[VPPolarity, FormList]]]
+MoodDictionary = dict[VerbMood, dict[VPPolarity, FormList]]
 
 # A copula:
 class Copula(Entity["Copula"]):
@@ -60,7 +60,7 @@ class Copula(Entity["Copula"]):
                 for s in ss:
                     tenses[t][s] = {}
                     for p in ps:
-                        tenses[t][s][p] = []
+                        tenses[t][s][p] = FormList()
         self.tenses = tenses
 
         if moods is None:
@@ -68,35 +68,35 @@ class Copula(Entity["Copula"]):
             for m in ms:
                 moods[m] = {}
                 for p in ps:
-                    moods[m][p] = []
+                    moods[m][p] = FormList()
         self.moods = moods
         # endregion
 
         self.disambig = disambig
 
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> "Copula":
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree], keep_doc: bool=False) -> "Copula":
         if isinstance(doc, str):
             xml = ET.parse(doc)
-            return cls.create_from_xml(xml)
+            return cls.create_from_xml(xml, keep_doc=keep_doc)
 
         root = doc.getroot()
         disambig = root.get("disambig", "")
 
-        verb = cls(
+        copula = cls(
             disambig=disambig,
         )
-        tenses: TenseDictionary = verb.tenses
-        moods: MoodDictionary = verb.moods
+        tenses: TenseDictionary = copula.tenses
+        moods: MoodDictionary = copula.moods
 
         # Helper methods to add forms quickly:
         def _addTense(
             t: VerbTense, d: VPShape, p: VPPolarity, form: str, pre_vowel: str | None
         ) -> None:
-            tenses[t][d][p].append((Form(form), Form(pre_vowel) if pre_vowel is not None else None))
+            tenses[t][d][p].append(FormVS(form, pre_vowel_sandhi=(pre_vowel if pre_vowel is not None else None)))
 
         def _addMood(m: VerbMood, p: VPPolarity, form: str, pre_vowel: str | None) -> None:
-            moods[m][p].append((Form(form), Form(pre_vowel) if pre_vowel is not None else None))
+            moods[m][p].append(FormVS(form, pre_vowel_sandhi=(pre_vowel if pre_vowel is not None else None)))
 
         el: ET._Element
         value: str
@@ -120,11 +120,14 @@ class Copula(Entity["Copula"]):
             polarity = VPPolarity(el.get("polarity"))
             _addMood(mood, polarity, value, pre_vowel)
 
-        return verb
+        if keep_doc:
+            copula._definition = doc
+
+        return copula
 
     # Extracts the copula's lemma:
     def getLemma(self) -> str:
-        return self.tenses[VerbTense.Pres][VPShape.Declar][VPPolarity.Pos][0][0].value
+        return self.tenses[VerbTense.Pres][VPShape.Declar][VPPolarity.Pos][0].value
 
     # Prints the verb in BuNaMo format:
     def printXml(self) -> ET._ElementTree:
@@ -143,11 +146,11 @@ class Copula(Entity["Copula"]):
         for tense in self.tenses:
             for shape in self.tenses[tense]:
                 for polarity in self.tenses[tense][shape]:
-                    for f, pre_vowel in self.tenses[tense][shape][polarity]:
+                    for f in self.tenses[tense][shape][polarity]:
                         el = ET.SubElement(root, "tenseForm")
                         el.set("default", f.value)
-                        if pre_vowel is not None:
-                            el.set("preVowel", pre_vowel.value)
+                        if f.pre_vowel_pre_vowel is not None:
+                            el.set("preVowel", f.pre_vowel_sandhi)
                         el.set("tense", tense.value)
                         el.set("shape", shape.value)
                         el.set("person", polarity.value)
@@ -155,11 +158,11 @@ class Copula(Entity["Copula"]):
         mood: VerbMood
         for mood in self.moods:
             for polarity in self.moods[mood]:
-                for f, pre_vowel in self.moods[mood][polarity]:
+                for f in self.moods[mood][polarity]:
                     el = ET.SubElement(root, "moodForm")
                     el.set("default", f.value)
-                    if pre_vowel is not None:
-                        el.set("preVowel", pre_vowel.value)
+                    if f.pre_vowel_sandhi is not None:
+                        el.set("preVowel", f.pre_vowel_sandhi)
                     el.set("mood", mood.value)
                     el.set("polarity", polarity.value)
 
@@ -169,10 +172,8 @@ class Copula(Entity["Copula"]):
         for tense in self.tenses.values():
             for shape in tense.values():
                 for polarity in shape.values():
-                    for default, pre_vowel in polarity:
+                    for default in polarity:
                         yield default
-                        if pre_vowel is not None:
-                            yield pre_vowel
 
     @property
     def moods_flattened(self):
@@ -180,5 +181,3 @@ class Copula(Entity["Copula"]):
             for polarity in mood.values():
                 for default, pre_vowel in polarity:
                     yield default
-                    if pre_vowel is not None:
-                        yield pre_vowel

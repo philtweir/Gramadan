@@ -122,15 +122,19 @@ class Database:
         self.demutate = demutate
         self._dictionary: Optional[DatabaseDictionary] = None
 
-    def load(self, database_dictionary_cls: Type[DatabaseDictionary]=DatabaseDictionary) -> None:
+    def load(self, database_dictionary_cls: Type[DatabaseDictionary]=DatabaseDictionary, keep_definitions: bool=False) -> None:
         entities: dict[str, type[EntityType]] = ENTITY_TYPE_MAP
         dict_cls = DemutatingDict if self.demutate else None
         self._dictionary = database_dictionary_cls(dict_cls=dict_cls)
         for folder, entity_type in entities.items():
             root = os.path.join(self.data_location, folder)
             for fn in os.listdir(root):
-                word: EntityType = entities[folder].create_from_xml(os.path.join(root, fn))
-                self._dictionary[folder][word.getLemma().lower()] = word
+                try:
+                    word: EntityType = entities[folder].create_from_xml(os.path.join(root, fn), keep_doc=keep_definitions)
+                    self._dictionary[folder][word.getLemma().lower()] = word
+                except Exception as e:
+                    expl = f"In {folder} {entity_type.__class__}: {fn}"
+                    raise RuntimeError(expl) from e
         supplementary_dir = os.path.join(os.path.dirname(__file__), 'supplementary')
         for fl in os.listdir(supplementary_dir):
             if not fl.endswith('.xml'):
@@ -141,7 +145,7 @@ class Database:
             base_xml = word.printXml()
             base_xml_root = base_xml.getroot()
             base_xml_root.extend(root_node.iterchildren())
-            self._dictionary[root_node.tag][root_node.get('default')] = entities[root_node.tag].create_from_xml(base_xml)
+            self._dictionary[root_node.tag][root_node.get('default')] = entities[root_node.tag].create_from_xml(base_xml, keep_doc=keep_definitions)
 
     @property
     def dictionary(self) -> DatabaseDictionary:

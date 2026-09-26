@@ -4,13 +4,15 @@ from lxml import etree as ET
 from typing import Union, TypeVar, Generic, Type
 from gramadan.verb import Verb
 from gramadan.features import Number, AutoName
-from gramadan.v2.features import Case, Gender, System, Article
+from gramadan.v2.features import Case, Gender, System, Article, FormList
+from gramadan.v2.explainer import Explainer, open_explanation_context
 
 T = TypeVar('T')
 class Entity(Generic[T]):
     v1: T
     _forms: dict = {} # Prevents __getattr__ being called
     _form_fields: tuple = ()
+    _definition: Union[str, ET._ElementTree] | None = None
     super_cls: Type[T]
 
     def __repr__(self):
@@ -45,19 +47,41 @@ class Entity(Generic[T]):
             self.v1 = v1
         else:
             self.v1 = self.super_cls(*args, **kwargs)
+        for form, fl in self.forms.items():
+            if isinstance(fl, FormList):
+                fl.name = form
+                fl.parent = self
 
     @property
-    def forms(self) -> dict[str, list]:
+    def forms(self) -> dict[str, FormList]:
         forms = {}
         for form in self._form_fields:
-            forms[form] = list(getattr(self, form, []))
+            forms[form] = getattr(self, form, FormList())
         forms.update(self._forms)
         return forms
 
+    def find_form_list(self, form_list: FormList):
+        for key, fl in self._forms.items():
+            if fl == form_list:
+                return key
+        raise LookupError("Could not find form list")
+
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET._ElementTree]):
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree], keep_doc: bool=False):
         v1 = cls.super_cls.create_from_xml(doc)
-        return cls(v1=v1)
+        v2 = cls(v1=v1)
+        if keep_doc:
+            v2._definition = doc
+        return v2
+
+    def explain(self) -> Explainer:
+        if self._definition is None:
+            raise RuntimeError(
+                "Must have keep_doc=True when creating to rebuild from XML for explaining"
+            )
+        with open_explanation_context() as expl:
+            self.create_from_xml(self._definition)
+        return expl
 
     def search(self, key, field):
         if field:
@@ -106,4 +130,5 @@ class Entity(Generic[T]):
             elif gender[0] == System.S:
                 form_name += "S"
         form_name = form_name[0].lower() + form_name[1:]
+
         return self.forms[form_name]

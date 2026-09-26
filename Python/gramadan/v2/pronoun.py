@@ -72,10 +72,10 @@ class Pronoun(Entity["Pronoun"]):
         self.disambig = disambig
 
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> "Copula":
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree], keep_doc: bool=False) -> "Pronoun":
         if isinstance(doc, str):
             xml = ET.parse(doc)
-            return cls.create_from_xml(xml)
+            return cls.create_from_xml(xml, keep_doc=keep_doc)
 
         root = doc.getroot()
         disambig = root.get("disambig", "")
@@ -116,6 +116,9 @@ class Pronoun(Entity["Pronoun"]):
             mood = VerbMood(el.get("mood"))
             polarity = VPPolarity(el.get("polarity"))
             _addMood(mood, polarity, value, pre_vowel)
+
+        if keep_doc:
+            verb._definition = doc
 
         return verb
 

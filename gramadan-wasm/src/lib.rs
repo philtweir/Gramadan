@@ -21,7 +21,9 @@ use gramadan::noun::{
     generate_genitive, guess_declension, plural_paradigm, singular_paradigm, Declension, Noun,
 };
 use gramadan::np::NounPhrase;
-use gramadan::verb::{guess_conjugation, PersonForms, TenseForms, Verb, VerbConjugationClass};
+use gramadan::verb::{
+    guess_conjugation, PersonForms, TenseForms, Verb, VerbConjugationClass, VerbPerson, VerbTense,
+};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -259,6 +261,36 @@ fn push_person(
     }
 }
 
+/// Emit shaped (particle + mutated) forms for a tense: interrogative positive
+/// ("dep-a") and declarative negative ("dep-n"). These are complete surface
+/// strings (e.g. "ar mhol", "ní mholann") ready for display.
+fn push_shaped(out: &mut Vec<FormItem>, v: &Verb, vt: VerbTense, tense_tag: &'static str) {
+    const PERSONS: [(&str, VerbPerson); 8] = [
+        ("base", VerbPerson::Base),
+        ("sg1", VerbPerson::Sg1),
+        ("sg2", VerbPerson::Sg2),
+        ("sg3", VerbPerson::Sg3),
+        ("pl1", VerbPerson::Pl1),
+        ("pl2", VerbPerson::Pl2),
+        ("pl3", VerbPerson::Pl3),
+        ("auto", VerbPerson::Auto),
+    ];
+    for (key, person) in PERSONS {
+        if let Some(shaped) = v.shape_a(vt, person) {
+            let mut tags: Vec<&'static str> = vec![tense_tag, "indicative"];
+            tags.extend(person_tags(key));
+            tags.push("dep-a");
+            out.push(FormItem { written_rep: shaped, tags });
+        }
+        if let Some(shaped) = v.shape_n(vt, person) {
+            let mut tags: Vec<&'static str> = vec![tense_tag, "indicative"];
+            tags.extend(person_tags(key));
+            tags.push("dep-n");
+            out.push(FormItem { written_rep: shaped, tags });
+        }
+    }
+}
+
 /// Learner-core verb conjugation: verbal noun/adjective, past/present/future/
 /// conditional (each with independent + dependent sets) and the imperative. The
 /// habitual and subjunctive tenses are omitted for now. Dependent forms carry a
@@ -293,6 +325,18 @@ fn verb_paradigm(lemma: &str, class: &str) -> Paradigm {
         push_person(&mut forms, &tf.indep, &[tense, "indicative"], false, lemma);
         push_person(&mut forms, &tf.dep, &[tense, "indicative"], true, lemma);
     }
+
+    // Shape rules: interrogative positive (dep-a) and declarative negative (dep-n).
+    let shape_tenses: [(VerbTense, &'static str); 4] = [
+        (VerbTense::Past, "past"),
+        (VerbTense::PresCont, "present"),
+        (VerbTense::Fut, "future"),
+        (VerbTense::Cond, "conditional"),
+    ];
+    for (vt, tag) in shape_tenses {
+        push_shaped(&mut forms, &v, vt, tag);
+    }
+
     // Imperative has no independent/dependent split.
     push_person(&mut forms, &v.imper, &["imperative"], false, lemma);
 
@@ -378,6 +422,28 @@ mod indep_mutation_tests {
             .filter(|f| f.tags.contains(&tense) && !f.tags.contains(&"dependent"))
             .map(|f| f.written_rep)
             .collect()
+    }
+
+    fn shaped(lemma: &str, class: &str, tense: &str, shape: &str) -> Vec<String> {
+        verb_paradigm(lemma, class)
+            .forms
+            .into_iter()
+            .filter(|f| f.tags.contains(&tense) && f.tags.contains(&shape))
+            .map(|f| f.written_rep)
+            .collect()
+    }
+
+    #[test]
+    fn shaped_forms_are_emitted() {
+        // Regular: mol past
+        assert!(shaped("mol", "1", "past", "dep-a").contains(&"ar mhol".to_string()), "mol past dep-a");
+        assert!(shaped("mol", "1", "past", "dep-n").contains(&"níor mhol".to_string()), "mol past dep-n");
+        // Regular: mol present
+        assert!(shaped("mol", "1", "present", "dep-a").contains(&"an molann".to_string()), "mol pres dep-a");
+        assert!(shaped("mol", "1", "present", "dep-n").contains(&"ní mholann".to_string()), "mol pres dep-n");
+        // Regular: past autonomous (ar + Nil / níor + Nil)
+        assert!(shaped("mol", "1", "past", "dep-a").contains(&"ar moladh".to_string()), "mol auto past dep-a");
+        assert!(shaped("mol", "1", "past", "dep-n").contains(&"níor moladh".to_string()), "mol auto past dep-n");
     }
 
     #[test]

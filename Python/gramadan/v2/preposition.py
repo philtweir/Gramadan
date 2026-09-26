@@ -2,11 +2,12 @@ from typing import Optional, Union
 from lxml import etree as ET
 
 from gramadan import preposition
-from .features import Form
+from .features import Form, FormList
 from .entity import Entity
 from .np import NP
 from .noun import Noun
 preposition.Form = Form
+preposition.FormList = FormList
 
 # A class for a preposition:
 class Preposition(Entity[preposition.Preposition]):
@@ -62,7 +63,7 @@ class Preposition(Entity[preposition.Preposition]):
         )
         supplementary_fields = self._form_fields[8:]
         self._forms.update({
-            field: [] if field not in kwargs else kwargs[field]
+            field: FormList() if field not in kwargs else kwargs[field]
             for field in supplementary_fields
         })
 
@@ -77,10 +78,10 @@ class Preposition(Entity[preposition.Preposition]):
         return cls(v1=v1)
 
     @classmethod
-    def create_from_xml(cls, doc: Union[str, ET._ElementTree]) -> Entity:
+    def create_from_xml(cls, doc: Union[str, ET._ElementTree], keep_doc: bool=False) -> Entity:
         if isinstance(doc, str):
             xml = ET.parse(doc)
-            return cls.create_from_xml(xml)
+            return cls.create_from_xml(xml, keep_doc=keep_doc)
         root = doc.getroot()
         lemma = root.get("default", "")
         disambig = root.get("disambig", "")
@@ -91,10 +92,14 @@ class Preposition(Entity[preposition.Preposition]):
         for form in cls._form_fields:
             for el in root.findall(f"./{form}"):
                 if form not in forms:
-                    forms[form] = []
+                    forms[form] = FormList()
                 forms[form].append(Form(el.get("default", "")))
 
-        return cls(lemma, disambig=disambig, v1=None, **forms)
+        v2 = cls(lemma, disambig=disambig, v1=None, **forms)
+        if keep_doc:
+            cls._definition = doc
+
+        return v2
 
     # Prints the preposition in BuNaMo format:
     def printXml(self) -> ET._ElementTree:

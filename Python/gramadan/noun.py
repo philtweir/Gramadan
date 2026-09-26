@@ -3,7 +3,7 @@
 from lxml import etree as ET
 from typing import Optional, Union
 
-from .features import FormSg, Form, FormPlGen, Gender, Strength
+from .features import FormSg, Form, FormPlGen, Gender, Strength, FormList
 from .singular_info import SingularInfo
 from .plural_info import PluralInfo
 
@@ -65,18 +65,18 @@ class Noun:
         disambig: str = "",
     ):
         # Noun forms in the singular:
-        self.sgNom: list[FormSg] = [] if sgNom is None else sgNom
-        self.sgGen: list[FormSg] = [] if sgGen is None else sgGen
-        self.sgVoc: list[FormSg] = [] if sgVoc is None else sgVoc
-        self.sgDat: list[FormSg] = [] if sgDat is None else sgDat
+        self.sgNom: list[FormSg] = FormList() if sgNom is None else sgNom
+        self.sgGen: list[FormSg] = FormList() if sgGen is None else sgGen
+        self.sgVoc: list[FormSg] = FormList() if sgVoc is None else sgVoc
+        self.sgDat: list[FormSg] = FormList() if sgDat is None else sgDat
 
         # Noun forms in the plural:
-        self.plNom: list[Form] = [] if plNom is None else plNom
-        self.plGen: list[FormPlGen] = [] if plGen is None else plGen
-        self.plVoc: list[Form] = [] if plVoc is None else plVoc
+        self.plNom: list[Form] = FormList() if plNom is None else plNom
+        self.plGen: list[FormPlGen] = FormList() if plGen is None else plGen
+        self.plVoc: list[Form] = FormList() if plVoc is None else plVoc
 
         # Noun form for counting (if any):
-        self.count: list[Form] = [] if count is None else count
+        self.count: list[Form] = FormList() if count is None else count
 
         # Whether this is a proper name:
         self.isProper = isProper
@@ -113,29 +113,29 @@ class Noun:
     # Constructors:
     @classmethod
     def create_from_info(cls, si: SingularInfo, pi: Optional[PluralInfo] = None) -> Noun:
-        sgNom: list[FormSg] = []
+        sgNom: list[FormSg] = FormList()
         wf: Form
         for wf in si.nominative:
             sgNom.append(FormSg(wf.value, si.gender))
 
-        sgGen: list[FormSg] = []
+        sgGen: list[FormSg] = FormList()
 
         for wf in si.genitive:
             sgGen.append(FormSg(wf.value, si.gender))
 
-        sgVoc: list[FormSg] = []
+        sgVoc: list[FormSg] = FormList()
 
         for wf in si.vocative:
             sgVoc.append(FormSg(wf.value, si.gender))
 
-        sgDat: list[FormSg] = []
+        sgDat: list[FormSg] = FormList()
 
         for wf in si.dative:
             sgDat.append(FormSg(wf.value, si.gender))
 
-        plNom: list[Form] = []
-        plGen: list[FormPlGen] = []
-        plVoc: list[Form] = []
+        plNom: list[Form] = FormList()
+        plGen: list[FormPlGen] = FormList()
+        plVoc: list[Form] = FormList()
         if pi is not None:
             for wf in pi.nominative:
                 plNom.append(Form(wf.value))
@@ -170,13 +170,13 @@ class Noun:
         plVoc: str,
     ) -> Noun:
         obj = cls(
-            sgNom=[FormSg(sgNom, gender)],
-            sgGen=[FormSg(sgGen, gender)],
-            sgVoc=[FormSg(sgVoc, gender)],
-            sgDat=[FormSg(sgNom, gender)],
-            plNom=[Form(plNom)],
-            plGen=[FormPlGen(plGen, strength)],
-            plVoc=[Form(plVoc)],
+            sgNom=FormList([FormSg(sgNom, gender)]),
+            sgGen=FormList([FormSg(sgGen, gender)]),
+            sgVoc=FormList([FormSg(sgVoc, gender)]),
+            sgDat=FormList([FormSg(sgNom, gender)]),
+            plNom=FormList([Form(plNom)]),
+            plGen=FormList([FormPlGen(plGen, strength)]),
+            plVoc=FormList([Form(plVoc)]),
         )
         return obj
 
@@ -199,7 +199,7 @@ class Noun:
         isDefinite = root.get("isDefinite") == "1"
         allowArticledGenitive = root.get("allowArticledGenitive") == "1"
 
-        sgNom: list[FormSg] = []
+        sgNom: list[FormSg] = FormList()
         el: ET._Element
         for el in root.findall("./sgNom"):
             sgNom.append(
@@ -209,7 +209,7 @@ class Noun:
                 )
             )
 
-        sgGen: list[FormSg] = []
+        sgGen: list[FormSg] = FormList()
         for el in root.findall("./sgGen"):
             sgGen.append(
                 FormSg(
@@ -218,7 +218,7 @@ class Noun:
                 )
             )
 
-        sgVoc: list[FormSg] = []
+        sgVoc: list[FormSg] = FormList()
         for el in root.findall("./sgVoc"):
             sgVoc.append(
                 FormSg(
@@ -227,7 +227,7 @@ class Noun:
                 )
             )
 
-        sgDat: list[FormSg] = []
+        sgDat: list[FormSg] = FormList()
         for el in root.findall("./sgDat"):
             sgDat.append(
                 FormSg(
@@ -236,11 +236,11 @@ class Noun:
                 )
             )
 
-        plNom: list[Form] = []
+        plNom: list[Form] = FormList()
         for el in root.findall("./plNom"):
             plNom.append(Form(el.get("default", "")))
 
-        plGen: list[FormPlGen] = []
+        plGen: list[FormPlGen] = FormList()
         for el in root.findall("./plGen"):
             plGen.append(
                 FormPlGen(
@@ -249,11 +249,11 @@ class Noun:
                 )
             )
 
-        plVoc: list[Form] = []
+        plVoc: list[Form] = FormList()
         for el in root.findall("./plVoc"):
             plVoc.append(Form(el.get("default", "")))
 
-        count: list[Form] = []
+        count: list[Form] = FormList()
         for el in root.findall("./count"):
             count.append(Form(el.get("default", "")))
 

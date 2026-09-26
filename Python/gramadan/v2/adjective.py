@@ -5,10 +5,11 @@ import re
 from typing import List, Optional, Union
 from gramadan import adjective
 from .singular_info import SingularInfo
-from .features import Form
+from .features import Form, FormList
 from .entity import Entity
 adjective.SingularInfo = SingularInfo
 adjective.Form = Form
+adjective.FormList = FormList
 
 
 class Adjective(Entity[adjective.Adjective]):
