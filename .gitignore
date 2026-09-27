@@ -316,6 +316,5 @@ briathra-*.txt
 aidiachta*.txt
 ainmfhocail*.txt
 test-*.txt
-/data
 /Tester/data
 *.egg-info
