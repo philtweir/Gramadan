@@ -302,6 +302,8 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 *.xml
+# but DO track the build-time verb XML patch snippets (see gramadan-rs/build.rs)
+!gramadan-rs/patches/*.xml
 
 # Python
 # =========================

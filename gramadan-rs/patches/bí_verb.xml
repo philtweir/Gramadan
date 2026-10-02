@@ -1,0 +1,3 @@
+  <tenseForm default="tá" tense="Pres" dependency="RelIndep" person="Base" />
+  <tenseForm default="bíos" tense="PresCont" dependency="RelIndep" person="Base" />
+  <tenseForm default="beas" tense="Fut" dependency="RelIndep" person="Base" />
